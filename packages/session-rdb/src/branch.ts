@@ -148,10 +148,15 @@ export function replaceLiveSessionLog(session: Session, events: readonly Session
 export class SessionBranchRdbProvider implements SessionBranchProvider {
   readonly name = "session-rdb";
 
-  constructor(
-    private readonly persistence: SessionPersistenceRdb,
+  // strip-only 兼容：不用 constructor 参数属性，字段在此声明、构造器内赋值。
+  private readonly persistence: SessionPersistenceRdb;
 
-    private readonly live: LiveSessionHooks = {
+  private readonly live: LiveSessionHooks;
+
+  constructor(
+    persistence: SessionPersistenceRdb,
+
+    live: LiveSessionHooks = {
       getSession: () => undefined,
       getAgent: () => undefined,
       flush: async () => true,
@@ -159,7 +164,10 @@ export class SessionBranchRdbProvider implements SessionBranchProvider {
       setCoordinatorState: () => {},
       setCoordinatorSeedLength: () => {},
     },
-  ) {}
+  ) {
+    this.persistence = persistence;
+    this.live = live;
+  }
 
   async readBranchPrefix(
     id: SessionId,

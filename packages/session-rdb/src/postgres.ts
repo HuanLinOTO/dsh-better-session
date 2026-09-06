@@ -29,10 +29,14 @@ export class PostgresBackend<THKT extends PgQueryResultHKT = PgQueryResultHKT> i
 
   private readonly tables: Record<string, any>;
 
-  constructor(
-    private readonly db: PgAsyncDatabase<THKT>,
-    private readonly options: PostgresBackendOptions,
-  ) {
+  // strip-only 兼容：不用 constructor 参数属性，字段在此声明、构造器内赋值。
+  private readonly db: PgAsyncDatabase<THKT>;
+
+  private readonly options: PostgresBackendOptions;
+
+  constructor(db: PgAsyncDatabase<THKT>, options: PostgresBackendOptions) {
+    this.db = db;
+    this.options = options;
     this.tables = toPostgresSchema(postgresTableDefs, this.options.schema ?? "public");
   }
 

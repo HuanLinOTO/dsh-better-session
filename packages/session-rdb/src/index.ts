@@ -145,9 +145,12 @@ export class SessionPersistenceRdb
 
   private readonly reuseEventIds = new Map<SessionId, Map<number, string>>();
 
+  // strip-only 兼容：不用 constructor 参数属性，字段在此声明、构造器内赋值。
+  public config: Config;
+
   constructor(
     ctx: Context,
-    public config: Config,
+    config: Config,
 
     injectedBackend?: Backend,
   ) {

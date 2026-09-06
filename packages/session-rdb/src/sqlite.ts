@@ -147,7 +147,12 @@ export class SqliteBackend implements Backend {
   private dbPath = "";
   private db!: SqliteDb;
 
-  constructor(private readonly options: SqliteBackendOptions) {}
+  // strip-only 兼容：不用 constructor 参数属性，字段在此声明、构造器内赋值。
+  private readonly options: SqliteBackendOptions;
+
+  constructor(options: SqliteBackendOptions) {
+    this.options = options;
+  }
 
   async open(): Promise<void> {
     const actual =
