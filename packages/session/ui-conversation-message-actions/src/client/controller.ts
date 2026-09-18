@@ -1,9 +1,5 @@
 import type { Context as ClientContext } from "@deepseek-ai/cordis";
-import type {
-  ISessions,
-  SessionFace,
-  SessionSnapshot,
-} from "@deepseek-ai/dsh-api-session-controller/client";
+import type { ISessions, SessionFace } from "@deepseek-ai/dsh-api-session-controller/client";
 import type { ObservableSnapshot, SnapshotStore } from "@deepseek-ai/dsh-client-store";
 import type { UiWorkspace } from "@deepseek-ai/dsh-client-ui-workspace/client";
 import { createSnapshotStore } from "@deepseek-ai/dsh-client-store";
@@ -50,9 +46,11 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function conversationRevision(snapshot: SessionSnapshot): string {
-  return [snapshot.openState, snapshot.removed, snapshot.hasMore].join("|");
-}
+/**
+ * 自动刷新的合并窗口。会话每次快照通知都拉一次投影，会把流式输出变成每帧一个
+ * 请求；窗口内的多次失效合并成一次刷新。
+ */
+export const AUTO_REFRESH_COALESCE_MS = 250;
 
 export class SessionEditorController {
   readonly store: SnapshotStore<SessionEditorState> = createSnapshotStore<SessionEditorState>({
@@ -68,7 +66,9 @@ export class SessionEditorController {
   private readonly uiWorkspace: UiWorkspace;
   private sessionSource: SessionFace | undefined;
   private sessionSourceDispose: (() => void) | undefined;
-  private sessionRevision: string | undefined;
+  private listSubscribeDispose: (() => void) | undefined;
+  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  private refreshChain: Promise<void> = Promise.resolve();
   private disposed = false;
   private users = 0;
 
@@ -120,7 +120,8 @@ export class SessionEditorController {
     this.sessionSource = undefined;
     this.sessionSourceDispose?.();
     this.bindSessionSource();
-    this.sessions.list.subscribe(() => this.invalidate());
+    this.listSubscribeDispose?.();
+    this.listSubscribeDispose = this.sessions.list.subscribe(() => this.invalidate());
   }
 
   private bindSessionSource(): void {
@@ -128,8 +129,6 @@ export class SessionEditorController {
     if (source === this.sessionSource) return;
     this.sessionSourceDispose?.();
     this.sessionSource = source;
-    this.sessionRevision =
-      source === undefined ? undefined : conversationRevision(source.getSnapshot());
     this.sessionSourceDispose = source?.subscribe(() => {
       this.invalidate();
     });
@@ -138,7 +137,21 @@ export class SessionEditorController {
   private invalidate(): void {
     if (this.disposed || this.store.getSnapshot().status === "idle") return;
 
-    void this.load();
+    this.scheduleRefresh();
+  }
+
+  /**
+   * 合并窗口内的多次失效成一次静默刷新。刷新串行执行，避免并发响应乱序覆盖；
+   * 一次刷新在途时的后续失效排到窗口之后，不会丢。
+   */
+  private scheduleRefresh(): void {
+    if (this.refreshTimer !== undefined) return;
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = undefined;
+      this.refreshChain = this.refreshChain.then(async () => {
+        if (!this.disposed) await this.load({ silent: true });
+      });
+    }, AUTO_REFRESH_COALESCE_MS);
   }
 
   private release(): void {
@@ -149,10 +162,15 @@ export class SessionEditorController {
   private dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    if (this.refreshTimer !== undefined) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = undefined;
+    }
     this.sessionSourceDispose?.();
     this.sessionSourceDispose = undefined;
     this.sessionSource = undefined;
-    this.sessionRevision = undefined;
+    this.listSubscribeDispose?.();
+    this.listSubscribeDispose = undefined;
   }
 
   private revive(): void {
@@ -161,12 +179,17 @@ export class SessionEditorController {
     void this.load();
   }
 
-  async load(): Promise<void> {
+  /**
+   * @param options.silent - 后台刷新：不写 `loading`、不清错误，避免面板随每次刷新闪动。
+   */
+  async load(options: { silent?: boolean } = {}): Promise<void> {
     if (this.disposed) return;
-    this.store.update((state) => {
-      state.status = "loading";
-      state.error = null;
-    });
+    if (options.silent !== true) {
+      this.store.update((state) => {
+        state.status = "loading";
+        state.error = null;
+      });
+    }
     try {
       const response = await fetch(
         `${editorApiPath()}?sessionId=${encodeURIComponent(this.sessionId)}`,

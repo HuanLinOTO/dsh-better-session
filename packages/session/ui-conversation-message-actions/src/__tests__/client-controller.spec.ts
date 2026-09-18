@@ -4,7 +4,7 @@
 // timeline 打开版本时导航到目标会话。
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionId } from "@deepseek-ai/dsh-session";
-import { SessionEditorController } from "../client/controller.ts";
+import { AUTO_REFRESH_COALESCE_MS, SessionEditorController } from "../client/controller.ts";
 import { SESSION_EDITOR_PATH } from "../shared.ts";
 
 interface FetchCall {
@@ -55,16 +55,23 @@ function fakeSessions(ids: readonly string[] = ["s1"]): {
   sessions: FakeSessions;
   drafts: string[];
   resyncs: string[];
+  emitSessionChange: () => void;
 } {
   const drafts: string[] = [];
   const resyncs: string[] = [];
+  const sessionListeners = new Set<() => void>();
   const byId: Record<string, unknown> = {};
   for (const id of ids) byId[id] = {};
   const sessions: FakeSessions = {
     list: { subscribe: () => () => {}, getSnapshot: () => ({ byId }) },
     binding: () => ({
       session: {
-        subscribe: () => () => {},
+        subscribe: (listener: () => void) => {
+          sessionListeners.add(listener);
+          return () => {
+            sessionListeners.delete(listener);
+          };
+        },
         getSnapshot: () => ({ openState: "open", removed: false, hasMore: false }),
         resync: async () => {
           resyncs.push("resync");
@@ -78,7 +85,14 @@ function fakeSessions(ids: readonly string[] = ["s1"]): {
       get: () => ({ input: { for: () => ({ restoreDraft: (d: string) => drafts.push(d) }) } }),
     }),
   };
-  return { sessions, drafts, resyncs };
+  return {
+    sessions,
+    drafts,
+    resyncs,
+    emitSessionChange: () => {
+      for (const listener of Array.from(sessionListeners)) listener();
+    },
+  };
 }
 
 /** 导航归 ui-workspace：controller 只把目标交给 ctx.uiWorkspace.openSession。 */
@@ -240,5 +254,63 @@ describe("SessionEditorController（浏览器半）", () => {
     expect(second).toBe(false);
     release?.();
     await first;
+  });
+
+  it("会话连续变化合并成窗口内一次静默刷新", async () => {
+    vi.useFakeTimers();
+    try {
+      const { sessions, emitSessionChange } = fakeSessions();
+      const controller = controllerWith(sessions);
+      const calls = stubFetch([timelinePayload("s1")]);
+      await controller.load();
+      expect(calls).toHaveLength(1);
+
+      for (let i = 0; i < 30; i += 1) emitSessionChange();
+      expect(calls).toHaveLength(1);
+
+      await vi.advanceTimersByTimeAsync(AUTO_REFRESH_COALESCE_MS);
+      expect(calls).toHaveLength(2);
+
+      await vi.advanceTimersByTimeAsync(AUTO_REFRESH_COALESCE_MS * 4);
+      expect(calls).toHaveLength(2);
+      expect(controller.store.getSnapshot().status).toBe("ready");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("刷新在途时到达的失效不并发发请求，也不把状态打回 loading", async () => {
+    vi.useFakeTimers();
+    try {
+      const { sessions, emitSessionChange } = fakeSessions();
+      const controller = controllerWith(sessions);
+      stubFetch([timelinePayload("s1")]);
+      await controller.load();
+
+      let release: (() => void) | undefined;
+      let inFlight = 0;
+      vi.stubGlobal("fetch", async () => {
+        inFlight += 1;
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return responseFor(timelinePayload("s1"));
+      });
+
+      emitSessionChange();
+      await vi.advanceTimersByTimeAsync(AUTO_REFRESH_COALESCE_MS);
+      expect(inFlight).toBe(1);
+      expect(controller.store.getSnapshot().status).toBe("ready");
+
+      emitSessionChange();
+      await vi.advanceTimersByTimeAsync(AUTO_REFRESH_COALESCE_MS);
+      expect(inFlight).toBe(1);
+
+      release?.();
+      await vi.advanceTimersByTimeAsync(AUTO_REFRESH_COALESCE_MS);
+      expect(inFlight).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
