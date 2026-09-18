@@ -1,4 +1,7 @@
 {
-  "extends": ["devkit/tsconfig.json"],
-  "exclude": ["vendor/**", "packages/*/dist/*"],
+  "extends": ["@local/devkit/tsconfig.json"],
+  "exclude": ["vendor/**", "**/dist/*"],
+  "compilerOptions": {
+    "composite": false
+  }
 }

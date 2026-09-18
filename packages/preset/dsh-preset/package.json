@@ -1,0 +1,65 @@
+{
+  "name": "@morlay/dsh-preset",
+  "version": "0.0.6-alpha.3",
+  "description": "Personal dsh profile bundle: disables the shipped agent presets, builds generated standard / ptc presets into dist, declares personal llm-pi-ai provider routes, and carries the deployment sandbox access rules.",
+  "keywords": [
+    "dsh",
+    "dsh-bundle",
+    "llm-pi-ai",
+    "preset"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/morlay/dsh-plugin.git"
+  },
+  "files": [
+    "dist",
+    "src",
+    "tool",
+    "cordis.patch.yml"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./package.json": "./package.json",
+      "./cordis.patch.yml": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "pnpm exec tsdown",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "@morlay/dsh-prompt-reminder": "workspace:*",
+    "@morlay/dsh-reference-injection": "workspace:*",
+    "@morlay/dsh-sandbox-local": "workspace:*"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis-plugin-include": "workspace:*",
+    "@deepseek-ai/dsh-agent-presets": "workspace:*",
+    "@types/js-yaml": "^4.0.9",
+    "js-yaml": "^4.1.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:*"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "configTrees": [
+      {
+        "mount": "config/agent-presets",
+        "path": "dist/presets",
+        "scanRoster": true
+      }
+    ]
+  }
+}

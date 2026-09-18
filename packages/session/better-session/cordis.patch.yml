@@ -1,0 +1,58 @@
+- id: session-persistence-jsonl
+  disabled: true
+
+- id: session-projection-cache
+  disabled: true
+
+- id: session-query-sqlite
+  disabled: true
+
+- id: session-telemetry-otel
+  disabled: true
+
+- id: session-log-deepseek
+  disabled: true
+
+- id: storage-json
+  disabled: true
+
+- id: storage-domain
+  config:
+    backend: rdb
+
+# 官方对话外壳由 fork 接管：composer 草稿要改成块序列、队列行去掉 inline edit。
+# `ui-chat` 已回退官方行——它剩下的真实差异（token-format 死循环修复、
+# data-composer-stats）已由 `ui-conversation-message-actions` 在
+# `conversation.composer.dock`（id `stats`，priority -1）覆盖承载。
+- id: ui-conversation
+  disabled: true
+
+# 设置里的「已归档会话」入口由 `ui-conversation-manager` 的「对话管理」页面接管：
+# 同一个归档集连同搜索、取消归档，再加删除与导入为新会话，都收敛到那一页。
+- id: ui-settings-unarchive-sessions
+  disabled: true
+
+- insert:
+    - id: session-branch
+      name: "@morlay/session-branch"
+
+    - id: session-rdb
+      name: "@morlay/session-rdb"
+      config:
+        type: sqlite
+        path: !!js dshHomePath('sessions', 'sessions.sqlite')
+
+    - id: ui-conversation-message-actions
+      name: "@morlay/ui-conversation-message-actions"
+
+    - id: ui-conversation-fork
+      name: "@morlay/dsh-client-ui-conversation"
+
+    # css-in-js 样式层（styled / Token / 官方 token 消费）：fork 包的样式基础。
+    - id: ui-primitives-fork
+      name: "@morlay/dsh-client-ui-primitives"
+
+    # 「对话管理」全局面板页：nav 行 + main 面板（已归档会话的搜索 / 取消归档 /
+    # 删除 / 导入为新会话）。
+    - id: ui-conversation-manager
+      name: "@morlay/ui-conversation-manager"

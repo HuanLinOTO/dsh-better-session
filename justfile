@@ -1,6 +1,6 @@
-mod pg 'packages/session-rdb/tool/pg/justfile'
 mod vendor 'vendor/justfile'
-mod custom 'apps/dsh-custom/justfile'
+mod pg 'packages/session/session-rdb/tool/pg/justfile'
+mod custom 'apps/dsh-custom-next/justfile'
 
 default:
     just --list
@@ -28,13 +28,13 @@ lint:
     pnpm exec oxlint .
 
 publish:
-    pnpm -r --filter './packages/*' exec tsx {{ justfile_directory() }}/scripts/publish-if-need.mts
+    pnpm -r --filter './packages/*/*' --workspace-concurrency=1 exec tsx {{ justfile_directory() }}/scripts/publish-if-need.mts
 
 build *args:
-    @pnpm -r --filter './packages/*' run build {{ args }}
+    @pnpm -r --filter './packages/*/*' run build {{ args }}
 
 version *args:
-    pnpm -r --filter './packages/*' version {{ args }}
+    pnpm -r --filter './packages/*/*' version {{ args }}
 
 test:
     pnpm exec vitest run

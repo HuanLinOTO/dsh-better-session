@@ -1,14 +1,17 @@
 {
-  "name": "devkit",
+  "name": "@local/devkit",
   "version": "0.1.0",
-  "type": "module",
   "private": true,
+  "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./tsconfig.json": "./tsconfig.json"
   },
+  "devDependencies": {
+    "lightningcss": "^1.32.0",
+    "rolldown": "^1.2.8"
+  },
   "peerDependencies": {
-    "lightningcss": "^1.33.0",
     "tsdown": "0.22.x",
     "typescript": "7.x"
   }

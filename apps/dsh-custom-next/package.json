@@ -1,0 +1,53 @@
+{
+  "name": "dsh-custom-next",
+  "version": "0.1.6",
+  "private": true,
+  "files": [
+    "icon.svg",
+    "justfile",
+    "cordis.patch.yml"
+  ],
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@morlay/dsh-desktopify": "workspace:*",
+    "@morlay/better-session": "workspace:*",
+    "@morlay/dsh-preset": "workspace:*",
+    "dsh-context": "0.52.2"
+  },
+  "peerDependencies": {
+    "tsx": "*"
+  },
+  "dsh": {
+    "version": "workspace:*",
+    "profile": {
+      "bundles": [
+        "@morlay/better-session",
+        "@morlay/dsh-preset",
+        "dsh-context"
+      ]
+    },
+    "dev": {
+      "web": {
+        "clientBundles": {
+          "prefixes": [
+            "@morlay/"
+          ]
+        }
+      }
+    },
+    "desktop": {
+      "id": "ai.deepseek.dsh.custom-next",
+      "window": {
+        "width": 1280,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600
+      },
+      "icon": "icon.svg",
+      "dshHome": "xdg"
+    }
+  }
+}

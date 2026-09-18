@@ -1,0 +1,77 @@
+{
+  "name": "@morlay/dsh-desktopify",
+  "version": "0.1.8-alpha.5",
+  "description": "Desktop packaging tool for dsh workspaces: runs the @morlay/dsh-desktop-host child as a shared Web profile and proxies dsh-app:// to it with the Host-issued cookie, with dev (workspace-linked) and bundle (static, unsigned) modes.",
+  "keywords": [
+    "desktop",
+    "dsh",
+    "electron",
+    "electron-builder",
+    "packaging"
+  ],
+  "license": "MIT",
+  "author": "morlay",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/morlay/dsh-plugin.git"
+  },
+  "bin": {
+    "dsh-desktopify": "./src/cli/index.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "exports": {
+    ".": "./src/index.ts",
+    "./dev-client-bundles": "./src/dev-client/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "bin": {
+      "dsh-desktopify": "./dist/cli/index.mjs"
+    },
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./dev-client-bundles": "./dist/dev-client-bundles.mjs",
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "pnpm exec tsdown",
+    "gen:official-packages": "tsx scripts/gen-official-packages.ts",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh": "workspace:*",
+    "@morlay/dsh-desktop-host": "workspace:*",
+    "commander": "^15.0.0",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.16.1",
+    "extract-zip": "^2.0.1",
+    "lightningcss": "^1.32.0",
+    "pnpm": "12.4.2",
+    "rolldown": "1.x",
+    "sharp": "^0.35.4",
+    "tar": "^7.5.0",
+    "tsdown": "0.22.x"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-app-boot": "workspace:*",
+    "@deepseek-ai/dsh-client-connection": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*",
+    "@local/devkit": "workspace:*",
+    "@types/node": "^26.5.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:*",
+    "@deepseek-ai/dsh-client-modules": "workspace:*",
+    "@deepseek-ai/dsh-host-webserver": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24.11.0"
+  }
+}
