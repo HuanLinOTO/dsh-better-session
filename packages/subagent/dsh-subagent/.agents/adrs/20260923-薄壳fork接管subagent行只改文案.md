@@ -32,7 +32,7 @@
 
 **考虑过的选项**
 
-- **本地 patch（`patches/steps.json` 的 `text` 步骤）**：1 行 diff 最小，但那是改 vendor 树；本仓库对上游的常规姿态是
+- **本地 patch（`vendor/steps.ts` 的 `patch` 阶段 `text` 步骤）**：1 行 diff 最小，但那是改 vendor 树；本仓库对上游的常规姿态是
   「插件包接管」，patch 留给构建约束与上游缺陷。
 - **插件层接管派发 / 回报工具**：让触发条件失效（自研不带标记的 `send_message`）再由自研工具描述承担文案。代价是改
   模型面向契约：`tool-subagent-control` 行同时提供 `send_message` 与 `interrupt_agent`，禁用它就得自研两个工具；不改

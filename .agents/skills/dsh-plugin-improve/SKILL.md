@@ -14,7 +14,7 @@ disable-model-invocation: true
 - 架构词汇与判据来自 [`dsh-plugin-design`](../dsh-plugin-design/SKILL.md)：模块、接口、实现、深度、浅层、
   接缝、适配器、杠杆效应、局部性；以及删除测试、「接口就是测试面」、「一个适配器 = 假想接缝，两个 = 真接缝」。
   用这些词，不要漂到「组件」「服务」「边界」。
-- 领域名用 `.agents/CONTEXT.md` 里的词（边界见 [`.agents/CONTEXT-MAP.md`](../../CONTEXT-MAP.md)）；上游名一律
+- 领域名用 `.agents/GLOSSARY.md` 里的词（边界见 [`.agents/GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md)）；上游名一律
   用上游真源目录里的词。
 - 既有决策不重新讨论，已立的债不重复立项：见各层的 `.agents/adrs/` 与 `.agents/debts/`。
 
@@ -28,7 +28,7 @@ disable-model-invocation: true
 
 ## 三、扫描
 
-先读涉及上下文的 `.agents/CONTEXT.md` 与 ADR，再派子代理遍历代码，只记**确实遇到摩擦**的地方：
+先读涉及上下文的 `.agents/GLOSSARY.md` 与 ADR，再派子代理遍历代码，只记**确实遇到摩擦**的地方：
 
 - 理解一个概念要在许多小包之间跳（同一 family 下多包区尤其容易）？
 - 哪里**浅层**——插件只是薄薄包一层上游服务再注册，接口几乎和实现一样复杂？

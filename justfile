@@ -21,6 +21,12 @@ update:
         --filter './devpackages/*' \
         taze latest -w
 
+prepare:
+    just vendor sync
+    just vendor patch
+    just dep
+    just vendor prebuild
+
 clean:
     rm -f pnpm-lock.yaml;
     pnpm clean

@@ -24,5 +24,5 @@ pnpm exec dsh-desktopify dev            # 本仓库示例工作区：just custom
 pnpm exec dsh-desktopify bundle --dir   #                  just custom bundle
 ```
 
-前置条件：pnpm workspace、`vendor/deepseek-harness` 已构建（`just vendor prepare`）、工具 / 壳包 / 后端变体都已
+前置条件：pnpm workspace、`vendor/deepseek-harness` 已构建（`just prepare`）、工具 / 壳包 / 后端变体都已
 `pnpm build`。

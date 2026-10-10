@@ -36,7 +36,7 @@ description: 实现插件改动时用——先约定接缝再写测试（红→�
 
 - 不先写完所有测试再写实现（水平切片）；不预写下一轮的测试；不加规格没要求的抽象与钩子。
 - 重构不属于循环——它在 `dsh-plugin-review`；结构性重构在 `dsh-plugin-improve`。
-- 上游侧的改动（vendor 内容、patch、EXCLUDE、版本跟随）走 `dsh-plugin-upstream-sync`，不在本循环内。
+- 上游侧的改动（vendor 内容、`vendor/steps.ts` 的步骤、版本跟随）走 `dsh-plugin-upstream-sync`，不在本循环内。
 
 测试落在哪、怎么命名、跑在什么环境、各包的测试装配辅助与日志 fixture → **改动所属层**的
 `.agents/standards/`（通用部分在根 `standards/how-to-verify.md`）。

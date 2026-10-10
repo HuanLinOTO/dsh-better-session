@@ -32,7 +32,7 @@
 
 ## 交付与发布
 
-- **发布走 CI**：`.github/workflows/release.yml`（`main` 与 `next` 分支：`vendor prepare` → `dep` →
+- **发布走 CI**：`.github/workflows/release.yml`（`main` 与 `next` 分支：`prepare`（sync → patch → dep → prebuild）→
   `build` → `lint` → `test`（注入外部服务门控所需的环境变量）→ `build` → GitHub Packages publish）。
 - **dist-tag 随版本号走**（[`scripts/publish-if-need.mts`](../../scripts/publish-if-need.mts)）：稳定版 →
   `latest`；`-alpha.*` → `alpha`；其余预发布（rc / beta / …）→ `next`。预发布绝不落在 `latest`。

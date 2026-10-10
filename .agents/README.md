@@ -6,7 +6,7 @@
 
 | 目录 / 文件               | 每层都可       |
 | ------------------------- | -------------- |
-| `CONTEXT.md`              | 是             |
+| `GLOSSARY.md`             | 是             |
 | `standards/`              | 是             |
 | `designs/<YYYYMMDD>-*.md` | 是             |
 | `adrs/<YYYYMMDD>-*.md`    | 是             |
@@ -21,7 +21,7 @@
 - 仓库根 [`.agents/`](./)：跨包 / 跨层的事实（会话编辑词汇、规范、系统设计、仓库级决策与债）+ 全部技能；
 - 包层 `.agents/`：每层就地记录自己的术语、规范、设计、决策与债。
 
-哪个上下文归属哪些包、术语表的 home 在哪，见 [`CONTEXT-MAP.md`](./CONTEXT-MAP.md)。
+哪个上下文归属哪些包、术语表的 home 在哪，见 [`GLOSSARY-MAP.md`](./GLOSSARY-MAP.md)。
 
 ## 命名与引用
 

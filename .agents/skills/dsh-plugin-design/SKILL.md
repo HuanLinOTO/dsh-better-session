@@ -31,8 +31,8 @@ disable-model-invocation: true
 - 模糊词换规范词：「会话」是上游的 `Session`，还是我们的编辑目标？
 - 用具体场景压测关系与边界；交叉核对代码：文档说 A、代码做 B → 停下来问清。
 - 借上游的词先核对真源（`vendor/<name>/packages/**/src/` 与上游自带文档），别按发布包的 d.ts 猜语义。
-- 词定了**立刻**写进对应上下文的 `.agents/CONTEXT.md`（归属与边界见
-  [`.agents/CONTEXT-MAP.md`](../../CONTEXT-MAP.md)），不批量补。
+- 词定了**立刻**写进对应上下文的 `.agents/GLOSSARY.md`（归属与边界见
+  [`.agents/GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md)），不批量补。
 
 ## 三、产出记到哪个 home
 
@@ -40,19 +40,19 @@ disable-model-invocation: true
 不复制、不换说法。home 表在 [`AGENTS.md`](../../../AGENTS.md)。
 
 产出落在**改动所属那一层**的 `.agents/`（仓库根，或 `packages/<family>/<pkg>/`）；上下文按 family 分组，
-边界见 [`.agents/CONTEXT-MAP.md`](../../CONTEXT-MAP.md)，各层现状与布局见 [`.agents/README.md`](../../README.md)。
+边界见 [`.agents/GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md)，各层现状与布局见 [`.agents/README.md`](../../README.md)。
 
 写到哪里见仓库根 [`AGENTS.md`](../../../AGENTS.md) 的 home 表；这里只放**判据与格式**：
 
-| 你要表达的东西        | 判据                                                       | 格式                                             |
-| --------------------- | ---------------------------------------------------------- | ------------------------------------------------ |
-| 词是什么意思          | 归属见 [`CONTEXT-MAP.md`](../../CONTEXT-MAP.md) 的边界规则 | [`templates/context.md`](./templates/context.md) |
-| 设计与取舍            | 跨包跨层，或改动现有边界                                   | [`templates/design.md`](./templates/design.md)   |
-| 难逆的决策与理由      | 难逆 + 脱离上下文会困惑 + 真有取舍，三条同时成立           | [`templates/adr.md`](./templates/adr.md)         |
-| 已知且被接受的债      | 明知不好先这样 + 有可判定的销账条件 + 有不修的理由         | [`templates/debt.md`](./templates/debt.md)       |
-| 代码与包怎么写        | 接缝、依赖方向与验证方式在该层规范里判                     | 两处：如何写 / 如何验证                          |
-| 包 / 应用的门面与用法 | 超重就记债，不就地扩写                                     | GitHub 惯例：一句话定位 + 用法 + 链接            |
-| 怎么做（流程）        | 只放流程，不放判据                                         | frontmatter `name` + `description`（写清何时用） |
+| 你要表达的东西        | 判据                                                         | 格式                                               |
+| --------------------- | ------------------------------------------------------------ | -------------------------------------------------- |
+| 词是什么意思          | 归属见 [`GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md) 的边界规则 | [`templates/glossary.md`](./templates/glossary.md) |
+| 设计与取舍            | 跨包跨层，或改动现有边界                                     | [`templates/design.md`](./templates/design.md)     |
+| 难逆的决策与理由      | 难逆 + 脱离上下文会困惑 + 真有取舍，三条同时成立             | [`templates/adr.md`](./templates/adr.md)           |
+| 已知且被接受的债      | 明知不好先这样 + 有可判定的销账条件 + 有不修的理由           | [`templates/debt.md`](./templates/debt.md)         |
+| 代码与包怎么写        | 接缝、依赖方向与验证方式在该层规范里判                       | 两处：如何写 / 如何验证                            |
+| 包 / 应用的门面与用法 | 超重就记债，不就地扩写                                       | GitHub 惯例：一句话定位 + 用法 + 链接              |
+| 怎么做（流程）        | 只放流程，不放判据                                           | frontmatter `name` + `description`（写清何时用）   |
 
 命名：三类记录都用 `<YYYYMMDD>-标题.md`（日期是采纳 / 创建日期；同一天多篇靠标题区分，没有序号）。H1 就是标题
 本身，不带日期或序号。designs 标题写主题、adr 标题写结论句、debts 标题写现象。小节名、段落名照模板，不另创。

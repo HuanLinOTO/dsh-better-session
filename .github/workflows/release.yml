@@ -32,8 +32,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
 
-      - run: just vendor prepare
-      - run: just dep
+      - run: just prepare
       - run: just build
       - run: just lint
       - run: just test
@@ -47,11 +46,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
-      - run: just vendor prepare
-      - run: just dep
+      - run: just prepare
 
       - name: Login to GitHub Packages
-        run: pnpm exec tsx scripts/login.mts
+        run: pnpm dlx @oxc-node/cli scripts/login.mts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

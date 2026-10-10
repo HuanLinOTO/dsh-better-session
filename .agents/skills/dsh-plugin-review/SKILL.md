@@ -23,8 +23,8 @@ disable-model-invocation: true
   `.agents/` 的分层规则；
 - 被审改动**所属层**的 `.agents/standards/`：如何写 / 如何验证——**逐条对照**，本技能不复制其中条目；
 - 各层 `.agents/adrs/`：既有决策——与 ADR 冲突按设计讨论处理，不是自动否决；
-- 包内 `README.md` 与 `.agents/CONTEXT.md`：该包的用法与词汇（边界在
-  [`.agents/CONTEXT-MAP.md`](../../CONTEXT-MAP.md)）；
+- 包内 `README.md` 与 `.agents/GLOSSARY.md`：该包的用法与词汇（边界在
+  [`.agents/GLOSSARY-MAP.md`](../../GLOSSARY-MAP.md)）；
 - [`dsh-plugin-upstream-sync`](../dsh-plugin-upstream-sync/SKILL.md)：上游只读边界、扩展面清单、本地 patch
   的登记要求——改动碰了 vendor / patch / 上游类型时按它判；
 - 坏味道基线（[`references/smell-baseline.md`](./references/smell-baseline.md)）：仓库规范优先于基线，
@@ -45,7 +45,7 @@ disable-model-invocation: true
 5. **测试强度**：断言是否会在预期回归时失败；是否验证外部可观察状态而非复述实现；是否踩了
    [`testing-antipatterns`](../dsh-plugin-implement/references/testing-antipatterns.md)。
 6. **记录同步**：动了边界、契约或流程，对应 home 是否更新，且没有在别处重复定义；新增的本地 patch /
-   EXCLUDE 是否按上游同步技能的登记要求记了原因。
+   `vendor/steps.ts` 步骤是否按上游同步技能的登记要求写清了为什么。
 7. **验证证据**：作者跑了哪条命令；跨包或配置类改动是否按证据矩阵跑了全量（`just test` / `just lint` /
    `just build`；碰了上游还要有 `just vendor …` 的结果）。
 
