@@ -7,11 +7,17 @@ import type { Step } from "../.agents/skills/dsh-plugin-upstream-sync/scripts/st
 
 // 从 sync 的干净基线跑一次（不是每条步骤都幂等）。
 export const patch: Step[] = [
-  // 本部署不用的子代理实现，整包裁掉（连带它们的依赖不进 workspace）。
-  { type: "rm", path: "packages/subagent/subagent-claude-code" },
-  { type: "rm", path: "packages/subagent/subagent-codex" },
+  // 上游的非产品面：文档站（依赖我们没装的 vitepress）、仓库脚本、测试快照、基准与 python 工具。
+  // 产品面（packages / vendor / native / apps）留下——`apps/cli` 被本仓库的工具与用例当 install anchor。
+  // 用 glob 形态（不存在就删 0 项）：这几样是"确保它不在"，不是"上游挪走即失败"的信号。
+  { type: "rm", glob: "website" },
+  { type: "rm", glob: "scripts" },
+  { type: "rm", glob: "snapshots" },
+  { type: "rm", glob: "benchmarks" },
+  { type: "rm", glob: "python" },
   // 指向上游不入库的测试快照的符号链接（断链）；本仓库不跑这条 acp e2e，删掉免得断链被遍历到。
-  { type: "rm", path: "apps/cli/tests/profiles/acp/cordis.yml" },
+  // 同样用 glob 形态：快照不入库，`reset` 之后它也不会回来。
+  { type: "rm", glob: "apps/cli/tests/profiles/acp/cordis.yml" },
   // 写端双协议：让 typert 的 `Remote`/`RemoteScope` 与 cordis 的 `Inject` 同时接受 TC39 与 legacy
   // 两种调用约定（类型面也一样）——本仓库根 tsconfig 开着 `experimentalDecorators`。
   { type: "git", patch: "decorator-dual-protocol.patch" },
@@ -38,25 +44,17 @@ export const patch: Step[] = [
       "@deepseek-ai/dsh-subprocess-local": { "./runner": "./src/bin.ts" },
     },
   },
-  // 给 typert analyzer 的「数据出口」跳过列表补 `css`：`.css` 与 `svg`/`png` 同类（无 TS API），
-  // 上游 `client/ui-theme` 的 `brand-font.css` 出口否则会在分析期被判成「missing source」。
-  {
-    type: "text",
-    file: "packages/typert/generator/src/analyzer.ts",
-    pattern: "json\\|ya\\?ml\\|svg\\|png\\|jpe\\?g\\|webp",
-    to: "css|json|ya?ml|svg|png|jpe?g|webp",
-  },
+  // 删上游全部 tsconfig：口径唯一——按文件就近找 tsconfig 的工具只会读到根上那一份，也不会撞上未开
+  // `experimentalDecorators` 的上游口径。typert 的生成走本仓库自己的 AST 生成器，不读它们，所以能在
+  // patch 阶段就删干净（`prebuild` 只写产物、不再改上游的配置面）。
+  { type: "rm", glob: "**/tsconfig*.json" },
 ];
 
-// 前置是 sync + patch 的干净基线：typert 分析靠上游根的 face tsconfig 找贡献者包，而本阶段末尾
-// 会把 tsconfig 删掉——重跑请从 sync 开始。
+// 前置是 sync + patch 的干净基线（上游 tsconfig 已在 patch 末尾删掉；typert 用自建的 AST 生成器）。
 export const prebuild: Step[] = [
-  // typert 产物写成 `.ts`：开发与桌面形态不再为 `./typert` / `./remote` 出口构建上游。它读上游
-  // 根的 face tsconfig（`tsconfig.host.json` / `tsconfig.client.json`）找贡献者包，所以必须排在
-  // 下面那条 `rm` 之前。
+  // typert 三件套（`lib/typert.{host,client,remote-client}.ts`）：`@local/typert-generator` 按 AST 合成
+  // 方法面（源码）与类型面（`target/dts` 声明树，缺了就补一次）。
   { type: "typert" },
   // 只编不得不编译的 addon（`.node` 是二进制产物，源码面消费不了）。
   { type: "native" },
-  // 删上游全部 tsconfig：口径唯一——按文件就近找 tsconfig 的工具只会读到根上那一份。
-  { type: "rm", glob: "**/tsconfig*.json" },
 ];

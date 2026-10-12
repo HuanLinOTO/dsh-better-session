@@ -3,8 +3,7 @@
   "compilerOptions": {
     "rewriteRelativeImportExtensions": false,
     "noEmit": false,
-    "emitDeclarationOnly": true,
-    "outDir": ".tmp/tsc-host"
+    "emitDeclarationOnly": true
   },
   "include": ["**/*"],
   "files": [
@@ -18,6 +17,13 @@
     "**/src/client/**",
     "vendor/**/*.config.ts",
     "vendor/**/tests/**",
-    "vendor/steps.ts"
+    "vendor/steps.ts",
+    // 上游 apps 是它自己的应用面（本仓库只用 apps/cli 当 install anchor），按我们的 TS 口径过不了；
+    // 声明生成（`target/dts`）压根不含它。文档站那类整块没用的已经由 patch 的 `rm` 步骤裁掉。
+    "vendor/**/apps/**",
+    "target/**",
+    "vendor/**/apps/**",
+    "**/website/**",
+    "vendor/**/vitest.shared.ts"
   ]
 }

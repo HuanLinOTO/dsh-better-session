@@ -93,9 +93,10 @@
     （否则 `TS2878`），上游两片 aggregate 同样关着。
   - 门仍是 `just lint`：oxlint 的 typeCheck 按文件就近发现 tsconfig、再按 references 解析到叶。`tsc -b`
     （或 `tsc -p` 两份叶）能把两片都过一遍，本仓文件 0 条，但会带 vendor 侧既有的 TS6307 之类的噪音。
-  - 构建（dts）另走 `tsconfig.build.json`：tsdown 一个包只有一份 tsconfig，client 入口必须在里面才出得了
-    `dist/client.d.cts`；换成 solution 根时 tsgo 没有 program，连 host 入口的 dts 都出不来（实测）。它不参与
-    类型门，由 devkit 的配置工厂从包目录往上找、自动带上。
+  - 构建（dts）**不走 tsconfig 文件**：全仓声明由 `@local/devkit` 的 `generateWorkspaceDts` 按两个 face 各扫
+    一次生成到 `target/dts`（`noCheck`，只要声明不要诊断），各包再由 `emitDts` 按路径取自己的那份合并——
+    每包一份类型图是 tsdown 默认路径的主要成本（实测单包 dts 4.8s、占该包构建 82%）。配置由 devkit 生成到
+    `.tmp/`，仓库里不再有第三份 tsconfig。
 - **`node/no-sync` 全开、无豁免**：运行时代码、测试与脚本（含 `.agents/skills/` 的同步 / patch / build
   脚本）一律用异步 node API（`node:fs/promises`、`promisify(execFile)`、`spawn` + Promise 包装），
   不用 `*Sync` 变体。`node:sqlite` 的 `DatabaseSync` 与 better-sqlite3 的同步用法是该驱动的语义、

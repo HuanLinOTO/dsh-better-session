@@ -181,10 +181,10 @@ export const patch: Step[] = [
 
 ### prebuild 阶段：steps.ts 的 `prebuild`（生成物 + native）
 
-- **`typert`** 是**生成式**步骤：直接编排上游 analyzer/emitter 生成 typert 产物，写成 `.ts`
-  （`lib/typert.<face>.ts`、`lib/typert.remote-client.ts`），避免开发 / 桌面形态为这两个出口
-  再构建一次上游。它不调用 `WorkspaceTypertGenerator.generate`——那条路径带 lib 形态的强制契约校验。
-  发现不了贡献者包即失败（那通常意味着 tsconfig 已被提前删掉）。
+- **`typert`** 是**生成式**步骤：跑本仓库自己的生成器（`@local/typert-generator`）产出
+  `lib/typert.{host,client,remote-client}.ts`——它按 **AST**（oxc）把上游源码的方法面与声明树
+  （`target/dts`，由 devkit 生成，缺了就补一次）的类型面合成产物，**不读上游 tsconfig、也不 import 上游
+  generator**（后者要给每个包各建一次 tsgo 类型图）。产物三件套都由它写，包数 / invocation 条数与上游一一对应。
 - **`native`**：只编**不得不编译**的 addon——`.node` 是二进制产物，源码面消费不了。它直接跑上游自己的
   `native/system/scripts/build.ts --host-addon-only`（同样由 `pnpm dlx @oxc-node/cli` 驱动）。
   **不 install、不经过 `pnpm run`**：上游自带 pnpm workspace，在它目录里跑 pnpm（`run` 在 node_modules

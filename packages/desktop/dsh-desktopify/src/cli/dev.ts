@@ -36,10 +36,11 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-// dev 形态给子进程注入的 TS loader：`@local/devkit` 的 oxc loader（转译 + legacy 装饰器降级）。
-// 上游包经 exports 指到 src 后，Node 原生 strip-only 不支持 parameter properties / enum / 装饰器。
+// dev 形态给子进程注入的 TS 注册：与工作区其它地方同一份（`pnpm-workspace.yaml` 的 `nodeOptions`），
+// 即 `@oxc-node/core/register`。上游包经 exports 指到 src 后，Node 原生 strip-only 不支持
+// parameter properties / enum / 装饰器，这一层转译必须挂上。
 function tsLoaderSpecifier(): string {
-  return import.meta.resolve("@local/devkit/ts-loader");
+  return import.meta.resolve("@oxc-node/core/register");
 }
 
 function withTsLoader(environment: NodeJS.ProcessEnv, loader: string): NodeJS.ProcessEnv {

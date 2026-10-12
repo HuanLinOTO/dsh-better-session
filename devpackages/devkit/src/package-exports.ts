@@ -20,6 +20,9 @@ export interface PackageExportsOptions {
   // 额外写 Node / Electron 的传统入口 `main` / `module`（都指包根出口的产物）：这类消费方不看
   // `exports`——Electron 以包目录为 app 启动时按 `main` 找主进程入口，缺了它退回 `index.js` 并报错。
   readonly legacy?: boolean;
+  // 声明文件名的来源。声明不再由 tsdown 产出（见 `dts.ts`），所以由调用方按同一套命名规则给出；
+  // 缺省时才回落到「从 tsdown 的产物块里收」。
+  readonly declarationFiles?: (entry: string) => readonly string[];
 }
 
 const PACKAGE_JSON_EXPORT = "./package.json";
@@ -90,6 +93,12 @@ export function packageExportsHook(options: PackageExportsOptions): BuildDoneHoo
       const found = run.entries.get(entry) ?? { runtime: [], declarations: [] };
       run.entries.set(entry, found);
       (declaration ? found.declarations : found.runtime).push(chunk.fileName);
+    }
+    if (options.declarationFiles !== undefined) {
+      for (const [entry, found] of run.entries) {
+        if (found.declarations.length === 0)
+          found.declarations.push(...options.declarationFiles(entry));
+      }
     }
     if (!complete(run, options) || run.write !== undefined) return;
 

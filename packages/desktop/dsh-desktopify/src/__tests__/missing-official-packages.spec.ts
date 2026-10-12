@@ -35,11 +35,12 @@ describe("desktop seed missing official packages error", () => {
     expect(matched[1]).toBe(shell.name);
     const command = shell.scripts?.[matched[2] ?? ""];
     expect(command).toBeDefined();
-    // TS 脚本靠随仓库的 oxc loader 直跑（`node --import=…ts-loader.mjs <脚本>`）：仓库里没有 tsx 依赖，
-    // `node_modules/.bin/tsx` 只是别家依赖顺带提升上来的。
-    const [runner, loaderArg, target] = (command ?? "").trim().split(/\s+/u);
+    // TS 脚本靠 oxc 的注册钩子直跑（`node --import @oxc-node/core/register <脚本>`）：仓库里没有 tsx
+    // 依赖，`node_modules/.bin/tsx` 只是别家依赖顺带提升上来的。
+    const [runner, importFlag, register, target] = (command ?? "").trim().split(/\s+/u);
     expect(runner).toBe("node");
-    expect(loaderArg).toMatch(/^--import=.*ts-loader\.mjs$/u);
+    expect(importFlag).toBe("--import");
+    expect(register).toBe("@oxc-node/core/register");
     expect((await stat(join(SHELL_ROOT, target ?? ""))).isFile()).toBe(true);
   });
 

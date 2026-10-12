@@ -1,0 +1,17 @@
+{
+  "name": "@local/typert-generator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Typert 产物生成器（TS 类型 → zod schema + 包反射），替代上游 generator 的那一步",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./cli": "./src/cli.ts"
+  },
+  "dependencies": {
+    "oxc-parser": "^0.153.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5"
+  }
+}

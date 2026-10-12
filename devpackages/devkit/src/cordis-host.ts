@@ -1,6 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
-import { dirname, join, sep } from "node:path";
-import type { UserConfig } from "tsdown";
+import { join, sep } from "node:path";
+import type { TsdownHooks, UserConfig } from "tsdown";
 import {
   CLIENT_ENTRY,
   clientBundleSpec,
@@ -9,7 +9,10 @@ import {
   type CordisClientOptions,
 } from "./cordis-client.ts";
 import { cssInlinePlugins } from "./css.ts";
-import { packageExportsHook } from "./package-exports.ts";
+import { packageExportsHook, type PackageExportsOptions } from "./package-exports.ts";
+import { dtsRootOf, emitDts, repoRootOf } from "./dts.ts";
+
+type BuildDoneHook = TsdownHooks["build:done"];
 
 // 本地私有包前缀：`@local/*` 只活在本 workspace、从不发布——构建时一律内联进产物，发布清单里也不出现它们。
 export const LOCAL_PACKAGE_PREFIX = "@local/";
@@ -34,19 +37,25 @@ async function entryExists(path: string): Promise<boolean> {
   }
 }
 
-// 从包目录往上找仓库根的 `tsconfig.build.json`：tsdown 一个包只有一份 tsconfig，而 client 入口必须
-// 在它里面才出得了 `dist/client.d.cts`——所以构建用的是两个 face 都在的那一份（理由见该文件），
-// 类型判定的两份（宿主 / client）在根上，`just lint` 按文件就近发现。
-// 仓库外（例如本包那个临时项目用例：cwd 在系统临时目录）找不到就交回 tsdown 默认发现；仓库里有包却缺
-// 这份配置，会在 dts 阶段以 `tsgo did not generate dts file for …/src/client/index.ts` 直接炸出来。
-async function findBuildTsconfig(from: string): Promise<string | undefined> {
-  for (let current = from; ;) {
-    const candidate = join(current, "tsconfig.build.json");
-    if (await entryExists(candidate)) return candidate;
-    const parent = dirname(current);
-    if (parent === current) return undefined;
-    current = parent;
-  }
+// `build:done` 的单一入口：先落该包的声明（从 `target/dts` 的全仓类型图按路径取、合并），再写回
+// `package.json` 的出口清单。声明每包只产一次——多格式构建（esm / cjs）会多次进这个钩子。
+const dtsRuns = new Set<string>();
+
+function buildDone(
+  options: PackageExportsOptions,
+  outDir: string,
+  declarationFiles: (entry: string) => readonly string[],
+): BuildDoneHook {
+  const exportsHook = packageExportsHook({ ...options, declarationFiles });
+  return async (ctx) => {
+    const cwd = process.cwd();
+    if (!dtsRuns.has(cwd)) {
+      dtsRuns.add(cwd);
+      const root = await repoRootOf(cwd);
+      await emitDts({ cwd, root, dtsRoot: dtsRootOf(root), entries: options.entries, outDir });
+    }
+    await exportsHook(ctx);
+  };
 }
 
 // cordis 插件包共享 tsdown 配置：host 与 client 是**同一次构建的两个入口**（client 的差别由
@@ -97,18 +106,16 @@ export async function defineCordisPluginConfig(options?: {
   const fromClient = (importer: string | null | undefined): boolean =>
     typeof importer === "string" && importer.includes(clientRoot);
 
-  // 声明生成那份 program（两个 face 都在）：见 `findBuildTsconfig`。
-  const buildTsconfig = await findBuildTsconfig(process.cwd());
-
   return {
     name: client?.name ?? (await packageName()),
     entry,
     outDir: options?.outDir ?? "dist",
-    ...(buildTsconfig === undefined ? {} : { tsconfig: buildTsconfig }),
     // client 产物是 CJS（模块系统的工厂契约），host 产物是 ESM；没有 client 入口的包只产 ESM。
     format: client === undefined ? ["esm"] : ["esm", "cjs"],
     platform: "node",
-    dts: options?.dts ?? true,
+    // 声明不归 tsdown：它给**每个包各建一次类型图**（实测单包 dts 4.8s、占该包构建 82%），而全仓一次
+    // 只要几秒。声明在这里由 `emitDts` 从 `target/dts`（`just build` 的第一步生成）按路径取来合并。
+    dts: false,
     fixedExtension: options?.fixedExtension ?? true,
     sourcemap: false,
     clean: true,
@@ -116,13 +123,18 @@ export async function defineCordisPluginConfig(options?: {
     // client 半固定成 CJS 单文件形态，手写的面（locale、cordis.patch.yml）在生成器里按文件存在性补。
     exports: false,
     hooks: {
-      "build:done": packageExportsHook({
-        entries: entry,
-        ...(client === undefined ? {} : { clientEntry: CLIENT_ENTRY }),
-        ...(options?.hidden === undefined ? {} : { hidden: options.hidden }),
-        ...(options?.bin === undefined ? {} : { bin: options.bin }),
-        ...(options?.legacy === undefined ? {} : { legacy: options.legacy }),
-      }),
+      "build:done": buildDone(
+        {
+          entries: entry,
+          ...(client === undefined ? {} : { clientEntry: CLIENT_ENTRY }),
+          ...(options?.hidden === undefined ? {} : { hidden: options.hidden }),
+          ...(options?.bin === undefined ? {} : { bin: options.bin }),
+          ...(options?.legacy === undefined ? {} : { legacy: options.legacy }),
+        },
+        options?.outDir ?? "dist",
+        (entry) =>
+          entry === CLIENT_ENTRY ? [`${entry}.d.cts`, `${entry}.d.mts`] : [`${entry}.d.mts`],
+      ),
     },
     // 双模式库（如 lexical 的 exports 带 development / production / node 条件）必须解析到与下面条件名
     // 一致的静态变体：条件名按 NODE_ENV 选 production / development，且不含 node。

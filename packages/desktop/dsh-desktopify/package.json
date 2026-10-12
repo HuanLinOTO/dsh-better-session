@@ -59,6 +59,7 @@
     "@deepseek-ai/dsh-client-connection": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
     "@local/devkit": "workspace:*",
+    "@oxc-node/core": "^0.1.6",
     "@types/node": "^26.5.0"
   },
   "peerDependencies": {

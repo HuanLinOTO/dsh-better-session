@@ -1,4 +1,4 @@
-import { glob, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { glob, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { pathExists, runInherited, type UpstreamPaths } from "./common.ts";
@@ -33,78 +33,33 @@ export type Phase = "patch" | "prebuild";
 // 脚本一律用 `pnpm dlx @oxc-node/cli` 驱动（oxc transformer + resolver 直跑 TS），不走 `node --import`。
 const OXC_CLI = ["dlx", "@oxc-node/cli"];
 
-// `typert` 步骤：直接编排上游 analyzer/emitter 生成 typert 产物，写成 `.ts`
-// （`lib/typert.<face>.ts`、`lib/typert.remote-client.ts`），避免开发 / 桌面形态为这两个出口再构建一次上游。
-// 它不调用 `WorkspaceTypertGenerator.generate`——那条路径带 lib 形态的强制契约校验。
-async function generateTypertArtifacts(dir: string): Promise<void> {
-  const entry = pathToFileURL(join(dir, "packages", "typert", "generator", "src", "index.ts")).href;
-  const generator = (await import(entry)) as {
-    WorkspaceCaches: new () => object;
-    WorkspaceAnalyzer: new (options: Record<string, unknown>) => {
-      discoverPackages(): { package: string }[];
-      analyze(): { faces: readonly { packages: readonly { name: string; root: string }[] }[] };
-    };
-    FaceModelEmitter: new (face: unknown) => {
-      emit(packageName: string): {
-        face: string;
-        js: string;
-        remote?: { js: string; dts: string };
-      };
-    };
+// `typert` 步骤：跑**本仓库自己的** typert 生成器（`@local/typert-generator`）——它按 AST 把上游源码的
+// 方法面与声明树的类型面合成 `lib/typert.*.ts`。不读上游 tsconfig，也不 import 上游 generator。
+//
+// 声明树（`target/dts`，由 `@local/devkit` 的 `generateWorkspaceDts` 生成）是它的输入：缺了就先生成一次
+// ——同一条链里 `just build` 也要它，共用一份。
+async function generateTypertArtifacts(dir: string, root: string): Promise<void> {
+  const { generateWorkspaceDts, dtsRootOf } = (await import("@local/devkit/dts")) as {
+    generateWorkspaceDts: (root: string) => Promise<void>;
+    dtsRootOf: (root: string) => string;
   };
-  const caches = new generator.WorkspaceCaches();
-  const discovered = new generator.WorkspaceAnalyzer({ root: dir, caches }).discoverPackages();
-  const packages = discovered.map((candidate) => candidate.package);
-  if (packages.length === 0) {
-    // 静默跳过会掩盖"上游 face tsconfig 被提前删掉"这类错误（分析器正是靠根 `tsconfig.host.json` /
-    // `tsconfig.client.json` 找贡献者包），所以这里直接失败。
-    throw new Error("typert: 没有发现贡献者包（face tsconfig 是否还在？）");
+  const { generateTypert } = (await import("@local/typert-generator")) as {
+    generateTypert: (options: {
+      upstreamRoot: string;
+      dtsRoot: string;
+      write: boolean;
+    }) => Promise<{ package: string; invocations: number }[]>;
+  };
+  const dtsRoot = dtsRootOf(root);
+  if (!(await pathExists(join(dtsRoot, "vendor")))) {
+    console.log("[steps] typert: 声明树缺失，先生成一次");
+    await generateWorkspaceDts(root);
   }
-  console.log(`[steps] typert: 分析 ${packages.length} 个包…`);
-  const workspace = new generator.WorkspaceAnalyzer({
-    root: dir,
-    packages,
-    caches,
-    checkDiagnostics: false,
-  }).analyze();
-  let artifacts = 0;
-  let remotes = 0;
-  for (const face of workspace.faces) {
-    const emitter = new generator.FaceModelEmitter(face);
-    for (const packageModel of face.packages) {
-      const artifact = emitter.emit(packageModel.name);
-      const outDir = join(dir, packageModel.root, "lib");
-      await mkdir(outDir, { recursive: true });
-      // `js` 是运行时值；`dts` 是声明。合成一份 `.ts` 时：
-      // - 值声明带上原声明的类型（`TYPERT` 保持 unknown，与上游「不让业务包依赖运行时注册表」一致）；
-      // - 丢掉 dts 里与值重名的 `export declare const`、重复的 `export default` 与失效的 sourceMappingURL；
-      // - 保留 `import type` 与 `declare module`（remote 的类型增强靠它）。
-      const hostTs = artifact.js.replace(
-        /^export const TYPERT = \{$/mu,
-        "export const TYPERT: unknown = {",
-      );
-      await writeFile(join(outDir, `typert.${artifact.face}.ts`), hostTs);
-      if (artifact.remote !== undefined) {
-        const withType = artifact.remote.js.replace(
-          /^export const TYPERT_REMOTE = \{$/mu,
-          "export const TYPERT_REMOTE: TypertRemoteContribution = {",
-        );
-        const enhancement = artifact.remote.dts
-          .split("\n")
-          .filter(
-            (line) =>
-              !line.startsWith("export declare const TYPERT_REMOTE") &&
-              !line.startsWith("export default ") &&
-              !line.startsWith("//# sourceMappingURL"),
-          )
-          .join("\n");
-        await writeFile(join(outDir, "typert.remote-client.ts"), `${withType}\n${enhancement}`);
-        remotes += 1;
-      }
-      artifacts += 1;
-    }
-  }
-  console.log(`[steps] typert: 生成 ${artifacts} 份 face 产物（其中 ${remotes} 份 remote-client）`);
+  const artifacts = await generateTypert({ upstreamRoot: dir, dtsRoot, write: true });
+  const invocations = artifacts.reduce((total, artifact) => total + artifact.invocations, 0);
+  console.log(
+    `[steps] typert: ${artifacts.length} 个包 / ${invocations} 条 invocation —— 已写入 lib/typert.*.ts`,
+  );
 }
 
 // `native` 步骤：只编**不得不编译**的 addon（`.node` 是二进制产物，源码面消费不了）。其余上游产物都由
@@ -172,7 +127,7 @@ async function runStep(step: Step, paths: UpstreamPaths): Promise<void> {
   }
   if (step.type === "typert") {
     console.log("[steps] typert -> lib/*.ts");
-    await generateTypertArtifacts(dir);
+    await generateTypertArtifacts(dir, paths.root);
     return;
   }
   if (step.type === "native") {
