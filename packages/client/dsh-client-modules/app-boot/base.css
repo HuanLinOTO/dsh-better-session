@@ -32,3 +32,153 @@ body {
   color: var(--dsw-alias-label-primary, #0f1115);
   background: var(--dsw-alias-bg-base, #fff);
 }
+
+/* ---- 启动页（`boot-page.ts`）：与上游 `@deepseek-ai/dsh-client-web/src/boot-page.module.css` 一致。
+ *
+ * 这份**不能**依赖主题注入成功——它的职责正是"主题/插件还没到"的那段；`--dsw-*` 有就取，没有就用这里的
+ * 回退值（深色模式按 `body[data-ds-dark-theme]` 换一组）。 */
+
+.dsh-boot {
+  --dsh-boot-label-primary: #0f1115;
+  --dsh-boot-label-secondary: #61666b;
+  --dsh-boot-label-tertiary: #81858c;
+  --dsh-boot-border: rgb(0 0 0 / 10%);
+  --dsh-boot-brand: #0f1115;
+
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--dsw-alias-bg-base, var(--dsh-boot-bg, Canvas));
+}
+
+body[data-ds-dark-theme] .dsh-boot {
+  --dsh-boot-label-primary: #f9fafb;
+  --dsh-boot-label-secondary: #cfd3d6;
+  --dsh-boot-label-tertiary: #adb2b8;
+  --dsh-boot-border: rgb(255 255 255 / 12%);
+  --dsh-boot-brand: #f9fafb;
+}
+
+.dsh-boot-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.dsh-boot-wordmark {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--dsw-alias-label-primary, var(--dsh-boot-label-primary));
+}
+
+.dsh-boot-hint {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary, var(--dsh-boot-label-tertiary));
+}
+
+.dsh-boot-spinner {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  corner-shape: round;
+  border: 2px solid var(--dsw-alias-border-l2, var(--dsh-boot-border));
+  animation: dsh-boot-spin 0.8s linear infinite;
+}
+
+.dsh-boot-spinner::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: conic-gradient(
+    var(--dsw-alias-brand-primary, var(--dsh-boot-brand)) var(--dsh-boot-arc, 72deg),
+    transparent 0
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
+}
+
+@keyframes dsh-boot-spin {
+  to { transform: rotate(360deg); }
+}
+
+.dsh-boot-failed {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dsh-boot-failed-title {
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary, var(--dsh-boot-label-primary));
+}
+
+.dsh-boot-failed-item {
+  font-family: var(--ds-font-family-code, "SF Mono", "JetBrains Mono", Consolas, Menlo, monospace);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary, var(--dsh-boot-label-secondary));
+  white-space: pre-wrap;
+}
+
+/* ---- macOS 桌面：**唯一的拖拽声明**（与上游 `@deepseek-ai/dsh-client-web/src/base.css` 一致）。
+ *
+ * 我们不走上游 shell，这几条得自己带。一条 chrome row 在 markup 里标 `data-window-drag`，它自己的盒子就是
+ * 可拖拽几何（不必再让某条固定高度的带子去对齐）——侧边栏顶部那条 strip 就是这么标的：在 macOS 上拖它
+ * 即拖窗口，而它上面的按钮照常点击（这就是"穿透"）。
+ *
+ * Electron 按**几何**合成 app-region 而不是命中测试，所以盖在 row 上的浮层要自己减掉：`body` 的直接子元素
+ * （除 `#root`）与 `#root` 里的交互控件（原生元素、ARIA role、tabindex 的自定义件）一条选择器统一减，
+ * 不必每个组件各自 opt-out。`data-window-drag-recall` 是"某条 row 的盒子动过、要 Electron 重收拖拽矩形"
+ * 的那一帧脉冲（electron#32341）。 */
+
+html[data-platform="darwin"] [data-window-drag] {
+  -webkit-app-region: drag;
+}
+
+html[data-platform="darwin"] [data-window-drag-recall] {
+  -webkit-app-region: no-drag;
+}
+
+html[data-platform="darwin"] body > :not(#root) {
+  -webkit-app-region: no-drag;
+}
+
+html[data-platform="darwin"] :is(
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  summary,
+  [contenteditable="true"],
+  [tabindex],
+  [role="dialog"],
+  [role="alertdialog"],
+  [role="menu"],
+  [role="listbox"],
+  [role="tooltip"],
+  [role="button"],
+  [role="link"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="option"],
+  [role="checkbox"],
+  [role="radio"],
+  [role="switch"],
+  [role="slider"],
+  [role="combobox"],
+  [role="textbox"]
+) {
+  -webkit-app-region: no-drag;
+}

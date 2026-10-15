@@ -18,6 +18,7 @@ import "@deepseek-ai/dsh-client-ui-theme/brand-font.css";
 // 自己带——上游由 shell 的 `client/web/src/boot.ts` 引入，而**我们不走 shell**；`dsh-client-web` 是上游
 // web 应用的包，不在我们的部署闭包里（按包名引会解析成 `0.0.0` 而 404）。
 import "./base.css";
+import { BootPage } from "./boot-page.ts";
 import { Context } from "@deepseek-ai/cordis";
 // @ts-expect-error 虚拟模块由 devkit 的 vite 插件提供
 import rows from "dsh-client-rows";
@@ -41,6 +42,15 @@ if (ctx.logger !== undefined) {
   };
 }
 
+// 容器与上游一致：`#root`（`apps/web/index.html`）。挂载点与启动页都在注册**之前**取好。
+const container = document.getElementById("root");
+if (container === null) throw new Error("[dsh] entry: #root 挂载点不存在");
+
+// **启动页**（与上游一致）：React 要等 `ui-renderer` 才到，那之前由它显示"正在加载 / 失败了"——没有它就是
+// 白屏，而失败原因只在 console 里。它挂在 `#root` 里面，渲染器接管时摘掉。
+const boot = new BootPage(container);
+boot.setTotal(rows.length);
+
 // **按模块身份去重**：行清单里可能出现两条指向同一个包的 entry（包名写法不同，如带 `/client` 后缀），
 // 那样同一个模块会被 `ctx.plugin` 两次——第二次 `apply` 就撞上"同 namespace 的 locale 已注册"这类
 // 重复注册断言。
@@ -62,15 +72,16 @@ for (const [index, row] of rows.entries()) {
   try {
     console.log("[dsh] plugin", index, row.id, "inject:", JSON.stringify(plugin.inject ?? []));
     ctx.plugin(plugin, { name: plugin.name ?? row.id });
+    boot.setState(row.id, "active");
   } catch (error) {
     console.error("[dsh] plugin failed", row.id, error);
+    boot.setState(row.id, "failed");
+    boot.fail(String(error));
   }
 }
 console.log("[dsh] entry: plugins registered");
 
 // 容器与上游一致：`#root`（`apps/web/index.html`）。
-const container = document.getElementById("root");
-if (container === null) throw new Error("[dsh] entry: #root 挂载点不存在");
 
 // 等 **'root' slot 真的注册**再挂载：`layout` 服务在注册 slot 之前就已提供（`provide('layout')` 早于
 // `slots.register({name:'root'})`），所以等 uiRenderer 就绪不够——那时挂载会渲染一棵空树，之后注册也不会补渲。
@@ -80,6 +91,9 @@ for (let attempt = 0; attempt < 300; attempt += 1) {
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
 console.log("[dsh] entry: root slot ready");
+
+// 渲染器接管挂载点：启动页摘掉（挂在它里面会跟着一起被替换，这里显式收尾）。
+boot.dispose();
 
 await ctx.inject(["uiRenderer"], (scope) => {
   scope.effect(() => scope.uiRenderer.mount(container), "dev entry: application mount");
