@@ -24,16 +24,32 @@ _避免使用_：home、数据目录
 `node_modules` 与 lockfile 也在那里）；bundle 就是 profileDir 自己（它带自己的 `node_modules`）。
 _避免使用_：repoRoot（那是它在 dev 下的一个取值，不是它的定义）
 
+**闭包根（安装锚点，install anchor）**：
+**官方 bundles 与 `dsh`** 的解析基准——`<闭包根>/node_modules/@deepseek-ai/dsh/package.json`。上游 boot
+（`@deepseek-ai/dsh-app-boot` + `dsh`）拿它按 `dsh.profile.bundles` 逐行加载，所以这一格必须**带完整闭包**。
+三种形态的取值：dev 是工作区 store、`--prod` 是 deploy 目录、bundle 是 **profile 自己**（随包 tar 解压出来的那份）。
+_避免使用_：安装根（说"根"会和 profileDir / 解析根混）
+
 **buildCache**：
 **构建**工作缓存（`<workspace>/node_modules/.dshdev`）：`runtime/`、`seed/`、`deploy/`、`shell/`、
 `artifacts/`。只在构建机上存在，不随产物走。
 _避免使用_：构建目录、out
 
+**依赖面的三份**（别互相顶替）：
+**壳**（`Resources/app/node_modules`：壳自己的依赖，含 `@morlay/dsh-desktop-host`）、**profile**
+（`$DSH_HOME/profiles/<name>/node_modules`：**行加载面**，官方 bundles + `dsh` + 全部传递依赖，随包 tar 解压）、
+**runtime**（`Resources/runtime`：**只有工具链**，`node` / `pnpm` / loader，**没有** `node_modules`）。
+历史上 profile 的依赖由 runtime 逐包 `link:` 提供过：`link` 不带传递依赖、路径钉死构建机，代价是"少服务 /
+配置不生效"。
+_避免使用_：闭包（说清是哪一份）
+
 ### 形态
 
 **形态（form）**：
-同一套"格"的**两种取值组合**——`dev`（在工作区里跑，改完即生效）与 `bundle`（把部署打成 .app）。
-**没有第二套语义**：页面、前端链、loader、装配清单在两种形态下是同一条链，只是"装配根在哪、
-解析根在哪、谁提供 runtime"三格的取值不同。判据只有 `DSH_DEV_FORM`（有没有值），预编译策略与
-根的选择都读它。
+同一套"格"的**三种取值组合**——`dev`（在工作区里跑，改完即生效）、`--prod`（**不打包，但跑打包形态的解析
+面**：起之前只做一次 `pnpm deploy`，拿 deploy 目录同时当 profile 与 runtime，于是不必等一轮 electron-builder
+就能验证打包形态）、`bundle`（把部署打成 .app）。
+**没有第二套语义**：页面、前端链、loader、装配清单在三种形态下是同一条链，只是"装配根在哪、解析根在哪、
+闭包根在哪、谁提供 runtime"这几格的取值不同。判据只有 `DSH_DEV_FORM`（有没有值）——注意 `--prod` **不设**它
+（设了就退回 dev 的逐文件策略，"验证打包形态"落空），而 `dsh.dev.exclude` 也只在 dev 形态被读。
 _避免使用_：开发模式 / 打包模式（像是两套东西）
