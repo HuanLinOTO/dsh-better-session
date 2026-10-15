@@ -4,11 +4,11 @@
 // 具名候选源，由 schema 上名单字段的 `role('select', { source })` 认领（标签输入因此聚焦就有候选）。
 
 import { Context } from "@deepseek-ai/cordis";
-import type { SelectOption, SelectSpec } from "@morlay/dsh-client-ui-primitives/client";
+import type { SelectOption, SelectSpec } from "@morlay/dsh-client-ui-primitives";
 import { describe, expect, it } from "vitest";
-import { CATALOG_NS, SESSION_MODE_CATALOG_REMOTE } from "@morlay/dsh-session-mode/testing";
-import { SessionModeCatalog } from "@morlay/dsh-session-mode/testing";
-import { POLICY_NAMES } from "@morlay/dsh-session-mode";
+import { CATALOG_NS, SESSION_MODE_CATALOG_REMOTE } from "../../testing.ts";
+import { SessionModeCatalog } from "../../testing.ts";
+import { POLICY_NAMES } from "../../index.ts";
 import { apply } from "../index.ts";
 
 // host 半的语境：只有这次要读的那两个服务，其余照空。

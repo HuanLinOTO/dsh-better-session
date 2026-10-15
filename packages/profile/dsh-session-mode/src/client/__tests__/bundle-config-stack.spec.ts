@@ -17,14 +17,14 @@ import {
   projectForm,
   volatileForm,
 } from "@deepseek-ai/dsh-settings/src/schema.ts";
-import { SchemaFormHints } from "@morlay/dsh-client-ui-primitives/client";
+import { SchemaFormHints } from "@morlay/dsh-client-ui-primitives";
 import {
   createBundleConfigFace,
   unwrapService,
   type BundleTranslate,
   type HintsLike,
 } from "../bundle-config.ts";
-import { Config } from "@morlay/dsh-session-mode";
+import { Config } from "../../index.ts";
 
 const t = ((key: string) => key) as BundleTranslate;
 

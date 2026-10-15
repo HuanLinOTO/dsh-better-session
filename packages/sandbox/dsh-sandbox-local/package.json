@@ -29,12 +29,19 @@
   },
   "publishConfig": {
     "exports": {
-      ".": "./dist/index.mjs",
-      "./rows": "./dist/rows.mjs",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "./rows": {
+        "types": "./dist/rows.d.mts",
+        "default": "./dist/rows.mjs"
+      },
       "./package.json": "./package.json",
       "./client": {
-        "types": "./dist/client.d.cts",
-        "default": "./dist/client.cjs"
+        "types": "./dist/client.d.mts",
+        "import": "./dist/client.mjs",
+        "default": "./dist/client.mjs"
       },
       "./locale/*.json": "./locale/*.json"
     }

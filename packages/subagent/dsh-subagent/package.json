@@ -14,9 +14,11 @@
     "url": "https://github.com/morlay/dsh-plugin.git"
   },
   "files": [
+    "src",
     "locale/*.json",
     "dist",
-    "!**/__tests__"
+    "!**/__tests__",
+    "!**/vendor/**/__tests__"
   ],
   "type": "module",
   "exports": {
@@ -27,8 +29,14 @@
   },
   "publishConfig": {
     "exports": {
-      ".": "./dist/index.mjs",
-      "./rows": "./dist/rows.mjs",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "./rows": {
+        "types": "./dist/rows.d.mts",
+        "default": "./dist/rows.mjs"
+      },
       "./package.json": "./package.json",
       "./locale/*.json": "./locale/*.json"
     }
