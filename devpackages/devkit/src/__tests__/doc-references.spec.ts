@@ -11,7 +11,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 // 上游源码：文档引用上游文件时写的是上游仓内的相对路径（`packages/core/system-prompt/src/index.ts`）。
 const UPSTREAM = join(ROOT, "vendor/deepseek-harness");
 const SKIP_DIRS = new Set([
-  ".dsh-desktopify",
+  ".dshdev",
   ".git",
   ".pnpm",
   ".scratch",
@@ -32,7 +32,7 @@ const NOT_A_PATH = /[\s`*<>…{}|$="'?!()[\]]/u;
 // 历史修订路径（`git show HEAD:<path>`）：那个路径指的不是工作区当前状态。
 const REVISION = /^(?:[0-9a-f]{7,40}|HEAD|MERGE_HEAD|ORIG_HEAD)(?:[~^]\d*)?:/iu;
 // 构建产物 / 打包器布局 / 运行期数据：不是工作区里的源文件（本地不构建就压根没有）。
-const NON_SOURCE_DIR = /^(?:dist|lib|build|out|target|deploy|pnpm|userData|\.dsh-desktopify)\//u;
+const NON_SOURCE_DIR = /^(?:dist|lib|build|out|target|deploy|pnpm|userData|\.dshdev)\//u;
 const LINE_SUFFIX = /:\d+(?:-\d+)?$/u;
 const REMOTE = /^(?:https?:|mailto:)/u;
 
@@ -60,6 +60,8 @@ const basesOf = (dir: string, packageRoot: string): string[] => [
 const SAMPLE = "示例 / 通式：说的是通例（每个包都该有、按约定探测入口），没有唯一所指";
 const SHORT_FORM = "省略前缀的短形式：省了包名或 `.agents/`，或承接同句前一个全路径";
 const ELSEWHERE = "「同包 / 该包」指文内已交代的另一个包（上游包或兄弟包），代码片段省了前缀";
+const URL_PATH = "说的是宿主页面里的那个地址（URL 路径），不是工作区里的文件";
+const PACKAGE_SUBPATH = "包内子路径：省了包名，指的是某个依赖包里的哪一层";
 const EXCEPTIONS: readonly {
   readonly file: string;
   readonly code: string;
@@ -82,7 +84,7 @@ const EXCEPTIONS: readonly {
   { file: ".agents/standards/how-to-write.md", code: "./cordis.patch.yml", reason: SAMPLE },
   { file: ".agents/standards/how-to-write.md", code: "./icon.svg", reason: SAMPLE },
   {
-    file: "packages/desktop/dsh-desktopify/.agents/standards/how-to-verify.md",
+    file: "devpackages/dshdev/.agents/standards/how-to-verify.md",
     code: "src/client/index.ts",
     reason: SAMPLE,
   },
@@ -119,17 +121,17 @@ const EXCEPTIONS: readonly {
     reason: `${ELSEWHERE}（= 上游 client/shortcuts）`,
   },
   {
-    file: "packages/desktop/dsh-desktopify/.agents/debts/20260920-桌面宿主覆写connection认证方法.md",
+    file: "devpackages/dshdev/.agents/debts/20260920-桌面宿主覆写connection认证方法.md",
     code: "src/index.ts",
     reason: `${ELSEWHERE}（= packages/desktop/dsh-desktop-host）`,
   },
   {
-    file: "packages/desktop/dsh-desktopify/.agents/designs/20260920-桌面无端口传输与窗口对齐.md",
+    file: "devpackages/dshdev/.agents/designs/20260920-桌面无端口传输与窗口对齐.md",
     code: "src/index.ts",
     reason: `${ELSEWHERE}（= packages/desktop/dsh-desktop-host，同段全路径已给）`,
   },
   {
-    file: "packages/desktop/dsh-desktopify/.agents/designs/20260920-桌面无端口传输与窗口对齐.md",
+    file: "devpackages/dshdev/.agents/designs/20260920-桌面无端口传输与窗口对齐.md",
     code: "src/seed.ts",
     reason: `${ELSEWHERE}（= packages/desktop/dsh-desktop-shell）`,
   },
@@ -148,7 +150,22 @@ const EXCEPTIONS: readonly {
     code: "./child-agent.ts",
     reason: `${ELSEWHERE}（= 上游 subagent 包内同目录的那个文件）`,
   },
-  // 上游短形式
+  // 上游短形式  // URL 路径与包内子路径：说的是"宿主页面里那个地址"或"某个包里的哪一层"，不是工作区里的文件
+  {
+    file: "packages/client/dsh-client-modules/.agents/debts/20261013-vite与宿主同进程.md",
+    code: "/index.ts",
+    reason: URL_PATH,
+  },
+  {
+    file: "packages/client/dsh-client-modules/.agents/designs/20261013-客户端资源的联邦式预编译.md",
+    code: "katex/dist/katex.min.css",
+    reason: PACKAGE_SUBPATH,
+  },
+  {
+    file: "packages/client/dsh-client-modules/.agents/designs/20261013-客户端资源的联邦式预编译.md",
+    code: "app-boot/node-stub.cjs",
+    reason: PACKAGE_SUBPATH,
+  },
 ];
 
 // 行内代码片段（成对的单反引号）与它所在行号；fenced code block 内的不算行内代码。

@@ -5,18 +5,19 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./patch": "./src/patch.ts",
-    "./ts-loader": "./src/ts-loader.mjs",
     "./tsconfig.json": "./tsconfig.json",
-    "./dts": "./src/dts.ts"
+    "./patch": "./src/patch.ts"
   },
   "devDependencies": {
+    "@browserbasehq/stagehand": "^4.2.1",
     "@deepseek-ai/cordis-plugin-include": "workspace:*",
     "@deepseek-ai/dsh-app-boot": "workspace:*",
     "@types/js-yaml": "^4.0.9",
     "esbuild": "^0.28.2",
     "js-yaml": "^4.1.0",
     "lightningcss": "^1.32.0",
+    "oxc-parser": "^0.154.0",
+    "playwright": "^1.64.0",
     "rolldown": "^1.2.8",
     "rolldown-plugin-dts": "0.28.x",
     "vite": "^8.3.1"

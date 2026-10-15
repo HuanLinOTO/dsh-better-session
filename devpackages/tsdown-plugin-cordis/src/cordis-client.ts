@@ -1,9 +1,13 @@
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { join } from "node:path";
 import { rolldown } from "rolldown";
 import type { Plugin } from "rolldown";
-import { cssInlinePlugins, resolveFileSpecifier } from "./css.ts";
+import { clientAssetPlugin, NODE_BUILTIN } from "./assets.ts";
+import { cssInlinePlugins } from "./css.ts";
+
+// 资产那套（mime 表、`?raw`、资产内联/落文件）的 home 在 `@morlay/dsh-client-modules/src/assets.ts`——
+// 运行期现场打包与这里的构建共用一份；下面只把名字转出来，外部 import 面不变。
+export { ASSET_MIME, clientAssetPlugin } from "./assets.ts";
 
 // `__ModuleLoader__.load` 手递的三段：banner / intro / footer（构建与现场打包共用）。
 const factoryBanner = (name: string): string =>
@@ -75,40 +79,26 @@ function escapeRegExp(value: string): string {
   return value.replace(/[/\\^$*+?.()|[\]{}]/gu, "\\$&");
 }
 
-// 本包依赖里 client 行的 external 面（判据：该包清单有 `exports["./client"]`，与上游 host 半同一判据）：
-// 漏判会让自己的 client 行落进内联分支，页面第二次注册即抛 `duplicate factory registration`。
-// 例外是标了 `dsh.client.inline` 的包：它有同一个出口，但**不是行**——代码随消费方打进产物（模块表里没有它，
-// 外置会 `missed the module table`），所以这里不纳入。每个 client 行返回一条 `^包名(?:/|$)` 正则；
-// `cwd` 缺省 `process.cwd()`。
+/**
+ * 消费方清单里**要 external 的包**：`peerDependencies` 的那些。
+ *
+ * 判据就一条——**按声明位置分流**：`peerDependencies` 由宿主/运行时提供，client 产物里保留 import
+ * （模块表有它的身份，内联反而会二次注册）；`dependencies` 的代码随产物内联（模块表里没有它们，
+ * 外置必然 `missed the module table`）。
+ *
+ * 这套规则**只用于 CJS 产物**：那是模块表（`__ModuleLoader__.load` 工厂）的形态，谁内联谁外置有硬约束。
+ * ESM 产物不做这套处理——它交给 vite / node 的 resolver。
+ *
+ * @param cwd - 消费方包目录，缺省 `process.cwd()`。
+ * @returns 每条一个 `^包名(?:/|$)` 的正则。
+ */
 export async function clientRowExternals(cwd = process.cwd()): Promise<RegExp[]> {
   const manifest = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
-    dependencies?: Record<string, string>;
     peerDependencies?: Record<string, string>;
   };
-  const names = [
-    ...new Set([
-      ...Object.keys(manifest.dependencies ?? {}),
-      ...Object.keys(manifest.peerDependencies ?? {}),
-    ]),
-  ].sort();
-  const require = createRequire(join(cwd, "package.json"));
-  const rows: RegExp[] = [];
-  for (const name of names) {
-    let target: string;
-    try {
-      target = require.resolve(`${name}/package.json`);
-    } catch {
-      continue; // 装不上（可选依赖 / 测试面）——按内联处理，不猜。
-    }
-    const dependency = JSON.parse(await readFile(target, "utf8")) as {
-      exports?: Record<string, unknown>;
-      dsh?: { client?: { inline?: boolean } };
-    };
-    if (dependency.dsh?.client?.inline === true) continue;
-    if (dependency.exports?.["./client"] === undefined) continue;
-    rows.push(new RegExp(`^${escapeRegExp(name)}(?:/|$)`));
-  }
-  return rows;
+  return Object.keys(manifest.peerDependencies ?? {})
+    .sort()
+    .map((name) => new RegExp(`^${escapeRegExp(name)}(?:/|$)`));
 }
 
 // client 入口的 entry 名（同一个 tsdown config 里与 host 入口并存）。
@@ -128,32 +118,34 @@ export function clientEntryPlugin(options: {
   return {
     name: "dsh-client-entry",
     async generateBundle(_outputOptions, bundle) {
-      const clientChunks: string[] = [];
+      // 一个 client 入口出**两种**产物：CJS 是模块表的工厂形态（发布/桌面用），ESM 是普通库
+      // （交给 vite / node resolver 消费）。tsdown 的 deps 规则按 format 区分不了，所以两边都由这里
+      // 自己产出字节：CJS 走 `bundleClientFactory`（内联判定那套），ESM 走 `bundleClientLibrary`。
+      let clientChunk: string | undefined;
+      let libraryChunk: string | undefined;
       for (const [fileName, item] of Object.entries(bundle)) {
         if (item.type !== "chunk") continue;
         if (DECLARATION_SUFFIXES.some((suffix) => fileName.endsWith(suffix))) continue;
-        const isClient = item.name === CLIENT_ENTRY;
-        const isClientFormat = fileName.endsWith(".cjs");
-        if (isClient !== isClientFormat) {
-          delete bundle[fileName];
-          continue;
-        }
-        if (isClient) clientChunks.push(fileName);
+        if (item.name !== CLIENT_ENTRY) continue;
+        if (fileName.endsWith(".cjs")) clientChunk = fileName;
+        else libraryChunk = fileName;
       }
-      const target = clientChunks[0];
-      if (target === undefined) return;
-      const chunk = bundle[target];
-      if (chunk === undefined || chunk.type !== "chunk") return;
-      const code = await bundleClientFactory({
-        name: options.name,
-        entry: options.entry,
-        ...(options.externals === undefined ? {} : { externals: options.externals }),
-      });
-      chunk.code = code;
-      // 自包含：断掉 tsdown 分块留下的相对引用（模块表解析不到它们）。
-      chunk.imports = [];
-      chunk.dynamicImports = [];
-      chunk.moduleIds = [];
+      const factory = clientChunk === undefined ? undefined : bundle[clientChunk];
+      if (factory !== undefined && factory.type === "chunk") {
+        factory.code = await bundleClientFactory({
+          name: options.name,
+          entry: options.entry,
+          ...(options.externals === undefined ? {} : { externals: options.externals }),
+        });
+        // 自包含：断掉 tsdown 分块留下的相对引用（模块表解析不到它们）。
+        factory.imports = [];
+        factory.dynamicImports = [];
+        factory.moduleIds = [];
+      }
+      const library = libraryChunk === undefined ? undefined : bundle[libraryChunk];
+      if (library !== undefined && library.type === "chunk") {
+        library.code = await bundleClientLibrary({ name: options.name, entry: options.entry });
+      }
     },
   };
 }
@@ -191,8 +183,11 @@ export async function bundleClientFactory(options: ClientFactoryOptions): Promis
     // 内置模块**不能** external：`platform: 'browser'` 下 rolldown 默认把 node 内置标成 external，
     // 浏览器 require 它们必然失败。显式放行 → 走 clientAssetPlugin 的替身。
     external: (id: string) => !NODE_BUILTIN.test(id) && isClientExternal(id, spec.externals),
+    // `treeshake` 显式开：两条线（现场打包与发布）共用这一支，产物都该只留用到的代码。
+    treeshake: { moduleSideEffects: "no-external" },
     // 样式内联进字节：产物是自包含单文件，样式不能留在外部（见 cssInlinePlugins）。
-    plugins: [...cssInlinePlugins({ name: options.name }), clientAssetPlugin()],
+    // 资产同样内联：单文件没有放资产的位置（发布线也是这一支，见债务「CSS 大图资产化」）。
+    plugins: [...cssInlinePlugins({ name: options.name, assets: "inline" }), clientAssetPlugin()],
   });
   try {
     const { output } = await build.generate({
@@ -212,69 +207,51 @@ export async function bundleClientFactory(options: ClientFactoryOptions): Promis
   }
 }
 
+/**
+ * 同一份 client 入口的 **ESM 库产物**。
+ *
+ * 与 {@link bundleClientFactory} 的差别只有一处：**裸说明符一律外置**，不做模块表那套内联/外置判定——
+ * 模块表形态（CJS 工厂）对"谁内联谁外置"有硬约束，而 ESM 产物的依赖交给 vite / node 的 resolver。
+ *
+ * @param options - 插件 id 与 client 入口。
+ * @returns 产物源码。
+ */
+export async function bundleClientLibrary(options: {
+  name: string;
+  entry: string;
+  cwd?: string;
+}): Promise<string> {
+  const build = await rolldown({
+    input: options.entry,
+    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+    platform: "browser",
+    // 相对路径（含样式、资产、包内模块）照常处理；**裸说明符全部外置**。
+    external: (id: string) => !id.startsWith(".") && !id.startsWith("/") && !id.startsWith("\0"),
+    // 库产物保留导出面：消费方按名字取用，不能按"有没有被用到"摇掉。
+    treeshake: false,
+    // 样式与资产照旧内联成"模块执行即注入 + 导出 class 映射"：rolldown 不再支持把 CSS 当资源打包，
+    // 不处理就是 `UNSUPPORTED_FEATURE: Bundling CSS is no longer supported`。
+    plugins: [...cssInlinePlugins({ name: options.name, assets: "inline" }), clientAssetPlugin()],
+  });
+  try {
+    const { output } = await build.generate({
+      format: "es",
+      codeSplitting: false,
+      entryFileNames: "client.mjs",
+    });
+    const chunk = output.find((item) => item.type === "chunk");
+    if (chunk === undefined || chunk.type !== "chunk")
+      throw new Error(`devkit: bundleClientLibrary(${options.name}) produced no chunk`);
+    return chunk.code;
+  } finally {
+    await build.close();
+  }
+}
+
 function isExternal(id: string, externals: (string | RegExp)[]): boolean {
   return externals.some((e) => (typeof e === "string" ? id === e : e.test(id)));
 }
 
-// 资产内联：现场打包的产物是自包含单文件，图片与字体不能留在外部——上游 client 产物同样是
-// `data:<mime>;base64,…` 字符串（如 `ui-settings-account` 的 onboarding svg）。rolldown 默认把未知
-// 扩展名当 JS 解析，所以必须显式 load，否则 client 源码里的 `import x from './x.svg'` 会变成 PARSE_ERROR。
-const ASSET_MIME: Record<string, string> = {
-  svg: "image/svg+xml",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  gif: "image/gif",
-  webp: "image/webp",
-  avif: "image/avif",
-  ico: "image/x-icon",
-  woff: "font/woff",
-  woff2: "font/woff2",
-  ttf: "font/ttf",
-  otf: "font/otf",
-  eot: "application/vnd.ms-fontobject",
-};
-
-// `?raw` 内联：源码把 worker 之类的内容当字符串内联（`import source from './worker.ts?raw'`）。
-// query 必须在 `pre` 拿（默认顺序的钩子会先剥离它），所以走虚拟 id。
-const RAW_PREFIX = "\0dsh-client-raw:";
-const RAW_SUFFIX = ".mjs";
-
-// node 内置的浏览器替身：第三方向浏览器产物里带 `require("util")` 这类调用时，模块表与平台种子词都答不上来，
-// 整行会在 boot 期失败。上游对 `node:module` 是同一手法（`apps/web/src/node-module-stub.ts`）；这里统一成
-// 一个空 CJS 模块——不执行到的分支无害，真执行到会抛（浏览器里本就没有这些能力）。
-const NODE_BUILTIN_STUB = "\0dsh-node-builtin-stub.cjs";
-const NODE_BUILTIN =
-  /^(?:node:)?(?:assert|async_hooks|buffer|child_process|crypto|events|fs|http|https|module|net|os|path|process|stream|url|util|vm|worker_threads|zlib)$/;
-
-// 资产与 `?raw` 内联插件：client 半（现场打包）与 web 前端（现场编译）两条链共用。
-export function clientAssetPlugin(): Plugin {
-  return {
-    name: "dsh-client-asset",
-    resolveId: {
-      order: "pre",
-      handler(source: string, importer: string | undefined) {
-        if (NODE_BUILTIN.test(source)) return NODE_BUILTIN_STUB;
-        if (!source.endsWith("?raw")) return null;
-        return `${RAW_PREFIX}${resolveFileSpecifier(source.slice(0, -4), importer)}${RAW_SUFFIX}`;
-      },
-    },
-    async load(id: string) {
-      if (id === NODE_BUILTIN_STUB) return "module.exports = {};\n";
-      if (id.startsWith(RAW_PREFIX)) {
-        const file = id.slice(RAW_PREFIX.length, -RAW_SUFFIX.length);
-        this.addWatchFile(file);
-        return `export default ${JSON.stringify(await readFile(file, "utf8"))};`;
-      }
-      const file = id.split("?", 1)[0]!;
-      if (file.startsWith("\0")) return;
-      const mime = ASSET_MIME[file.slice(file.lastIndexOf(".") + 1).toLowerCase()];
-      if (mime === undefined) return;
-      const data = await readFile(file);
-      return `export default "data:${mime};base64,${data.toString("base64")}";`;
-    },
-  };
-}
 
 // 平台 baseline：主应用种子或静态表提供的模块（React / cordis / 共享原语）。
 const BASELINE: (string | RegExp)[] = [
