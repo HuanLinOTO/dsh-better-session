@@ -65,7 +65,9 @@
     "@types/node": "^26.5.0"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^",
+    "react": "^18.3.1",
+    "rolldown": "^1.2.14"
   },
   "engines": {
     "node": ">=24.11.0"

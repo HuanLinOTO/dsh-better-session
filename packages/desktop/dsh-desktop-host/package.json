@@ -75,15 +75,15 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:*",
-    "@deepseek-ai/dsh-api-gateway": "workspace:*",
-    "@deepseek-ai/dsh-client-connection": "workspace:*",
     "@local/devkit": "workspace:*",
     "@types/node": "^26.5.0",
     "@types/ws": "^8.18.2",
     "playwright": "^1.64.0"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-api-gateway": "workspace:*",
+    "@deepseek-ai/dsh-client-connection": "workspace:*"
   },
   "engines": {
     "node": ">=24.11.0"
