@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import type { Stats } from "node:fs";
 import {
   access,
@@ -50,6 +51,21 @@ async function isDirectory(path: string): Promise<boolean> {
   }
 }
 
+/** 解压随包的依赖归档：实体文件、闭包完整（替代逐包 `link:` 那种写法）。 */
+async function extractProfileModules(archive: string, profileDir: string): Promise<void> {
+  await new Promise<void>((done, fail) => {
+    const child = spawn("tar", ["-xzf", archive, "-C", profileDir], {
+      stdio: ["ignore", "ignore", "inherit"],
+    });
+    child.on("error", fail);
+    child.on("close", (code) =>
+      code === 0 ? done() : fail(new Error(`tar -xzf ${archive} exited with ${String(code)}`)),
+    );
+  });
+}
+
+export const PROFILE_MODULES_ARCHIVE_NAME = "profile-node-modules.tar";
+
 export async function ensureSeedProfile(seedDir: string, home: string): Promise<boolean> {
   const seedProfile = join(seedDir, "profiles", PROFILE_NAME);
   if (!(await isDirectory(seedProfile))) return false;
@@ -80,6 +96,14 @@ export async function ensureSeedProfile(seedDir: string, home: string): Promise<
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
   await copySeed(seedProfile, profileDir);
+
+  // **profile 的依赖面**：随包那份归档解压进来（实体文件、闭包完整）。历史做法是壳按载荷清单逐包
+  // `link:`——`link` 不带传递依赖（上千个包会丢），路径还指向构建机（`.pnpm/<pkg>@file++++Users+…`）。
+  const archive = join(seedDir, PROFILE_MODULES_ARCHIVE_NAME);
+  if (await pathExists(archive)) {
+    await rm(join(profileDir, "node_modules"), { recursive: true, force: true });
+    await extractProfileModules(archive, profileDir);
+  }
   if (userPatch !== undefined) {
     await mkdir(dirname(patchPath), { recursive: true });
     await writeFile(patchPath, userPatch);

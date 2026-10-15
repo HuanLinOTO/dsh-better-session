@@ -1,3 +1,4 @@
+import { appendFile } from "node:fs/promises";
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
 import { once } from "node:events";
 import { Readable, Writable } from "node:stream";
@@ -83,6 +84,14 @@ export interface DesktopHostOptions {
 
   // host 非预期退出/管道断开时通知壳一次（壳据此拦截，别让页面停在半死状态）。
   readonly onFailure?: (error: Error) => void;
+
+  /**
+   * 宿主输出的落盘位置（壳给 `$DSH_HOME/logs/host.log`）。
+   *
+   * 打包形态下 GUI 的 stdout/stderr 没人看得到，而"某个 bundle/某一行没起来"的第一现场就在宿主这份输出里
+   * ——不落盘就只能看到"服务少了"，看不到为什么。
+   */
+  readonly logFile?: string;
 }
 
 // 桌面 host 子进程：字节管道上的请求/响应载体（FD 3/4）+ Node IPC 生命周期。
@@ -159,12 +168,23 @@ export class DesktopHostProcess {
     this.child = child;
     this.requestPipe = requestPipe;
     this.responsePipe = responsePipe;
+    // 宿主输出除转发之外**再落一份盘**（见 `logFile`）：打包形态 GUI 里看不到 stdout/stderr，
+    // 而"少服务"的原因只在宿主这份输出里。
+    const persist = (chunk: string): void => {
+      if (this.options.logFile === undefined) return;
+      void appendFile(this.options.logFile, chunk).catch(() => undefined);
+    };
     child.stderr?.setEncoding("utf8");
     child.stderr?.on("data", (chunk: string) => {
       this.stderr = (this.stderr + chunk).slice(-MAX_HOST_DIAGNOSTIC_CHARS);
       process.stderr.write(`[dsh-host] ${chunk}`);
+      persist(chunk);
     });
-    child.stdout?.pipe(process.stdout);
+    child.stdout?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => {
+      process.stdout.write(chunk);
+      persist(chunk);
+    });
     responsePipe.on("data", (chunk: Buffer) => {
       this.acceptResponseBytes(chunk);
     });

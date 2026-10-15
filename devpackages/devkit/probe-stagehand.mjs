@@ -27,6 +27,12 @@ const state = await page.evaluate(() => ({
   errors: globalThis.__PROBE_ERRORS__ ?? [],
 }));
 console.log("[页面]", JSON.stringify({ root: state.root, ctx: state.ctx, text: state.text }));
+// 装配清单：入口每注册一行就打 `[dsh] plugin N <行名>`（dev 与打包两面都走同一个入口）。
+const rows = consoleLines.filter((line) => line.startsWith("[dsh] plugin "));
+console.log("[行数]", rows.length);
+for (const line of rows) console.log("  ", line.replace(/^\[dsh\] plugin \d+ /, ""));
+const others = consoleLines.filter((line) => line.startsWith("[dsh]") && !line.startsWith("[dsh] plugin "));
+console.log("[入口其它]", others.slice(0, 6));
 console.log("[页面错误]", state.errors.length, [...new Set(state.errors)].slice(0, 6));
 
 await stagehand.close();

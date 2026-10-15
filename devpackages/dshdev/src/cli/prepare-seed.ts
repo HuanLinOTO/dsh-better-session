@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { createHash, type Hash } from "node:crypto";
 import type { Dirent } from "node:fs";
 import {
@@ -16,7 +17,6 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { OFFICIAL_PROFILE_BUNDLES } from "@morlay/dsh-desktop-shell/official";
 import {
-  PROFILE_RUNTIME_REPORT_NAME,
   PROFILE_WORKSPACE_NAME,
 } from "@morlay/dsh-desktop-shell/profile-project";
 import { SEED_HASH_NAME, SEED_RUNTIME_DIR_NAME } from "@morlay/dsh-desktop-shell/seed";
@@ -175,6 +175,21 @@ export async function prepareDeploySurface(workspace: string): Promise<string> {
   }
   await dropClientModulesCache(destination);
   return destination;
+}
+
+
+/** `profile` 依赖面的归档名：壳首启解压它（两边同名，见壳的 `seed.ts`）。 */
+const PROFILE_MODULES_ARCHIVE_NAME = "profile-node-modules.tar";
+
+/** 跑 `tar`（macOS/Linux 自带）：闭包上千个文件，别在 JS 里逐个拷。 */
+async function runTar(args: readonly string[]): Promise<void> {
+  await new Promise<void>((done, fail) => {
+    const child = spawn("tar", args, { stdio: ["ignore", "ignore", "inherit"] });
+    child.on("error", fail);
+    child.on("close", (code) =>
+      code === 0 ? done() : fail(new Error(`tar ${args.join(" ")} exited with ${String(code)}`)),
+    );
+  });
 }
 
 async function deployClosure(
@@ -414,7 +429,6 @@ export async function runPrepareSeed(options: PrepareSeedOptions): Promise<void>
 
   await rm(seedOutputRoot, { recursive: true, force: true });
   const runtimeDir = join(seedOutputRoot, SEED_RUNTIME_DIR_NAME);
-  const runtimeModulesDir = join(runtimeDir, "node_modules");
   const profileDir = join(seedOutputRoot, "profiles", PROFILE_NAME);
   await mkdir(runtimeDir, { recursive: true });
   await mkdir(profileDir, { recursive: true });
@@ -422,17 +436,23 @@ export async function runPrepareSeed(options: PrepareSeedOptions): Promise<void>
   // 运行时载荷：deploy 闭包就是 host 的 dsh 安装（解析锚点）与前端静态资源的来源；
   // 它在产物里不可变，也不再被种进用户的 DSH_HOME。
   await cp(join(deployRoot, "package.json"), join(runtimeDir, "package.json"));
-  await cp(join(deployRoot, "node_modules"), runtimeModulesDir, {
-    recursive: true,
-    verbatimSymlinks: true,
-  });
 
-  // profile 只持有 app 自带的（非官方 bundle）插件：官方包与 dsh 由 runtime 提供，这些包在 profile 的清单里
-  // 直接 `link:` 回随包 runtime 的闭包（不再往 profile 里落 `vendor/` 副本）。
+  // **profile 的依赖面**：把 deploy 的**完整闭包**打成一份 tar 随包带走，首启解压进 profile。
+  //
+  // 以前是壳按载荷清单逐包 `link:` 进 profile：`link` 不带传递依赖（959 个包丢了），指向的还是构建机的
+  // 绝对路径（`.pnpm/<pkg>@file++++Users+morlay+src+…`）。tar 解压出来是实体文件，闭包完整、换机器也不坏。
+  await runTar([
+    "czf",
+    join(seedOutputRoot, PROFILE_MODULES_ARCHIVE_NAME),
+    "-C",
+    deployRoot,
+    "node_modules",
+  ]);
+
+  // profile 只持有 app 自带的（非官方 bundle）插件；依赖面整体由上面那份 tar 承载（解压即实体闭包），
+  // 不再逐包 `link:` 回 runtime，也不再产 `desktop-runtime-packages.json` 那份载荷清单。
   const localBundles = profileLocalBundles(manifest);
-  const profilePackages = await withLocalClosure(runtimeModulesDir, localBundles);
   await copyProfileEntries(workspace, profileDir, entries);
-  const runtimeLinks = await profileRuntimeLinks(runtimeDir, runtimeModulesDir, profilePackages);
   await writeFile(
     join(profileDir, "package.json"),
     `${JSON.stringify(profileManifest(manifest), undefined, 2)}\n`,
@@ -442,16 +462,12 @@ export async function runPrepareSeed(options: PrepareSeedOptions): Promise<void>
     join(profileDir, PROFILE_WORKSPACE_NAME),
     profileWorkspace(await allowedBuilds(deployRoot)),
   );
-  await writeFile(
-    join(profileDir, PROFILE_RUNTIME_REPORT_NAME),
-    `${JSON.stringify({ schemaVersion: 1, runtimePackages: runtimeLinks }, undefined, 2)}\n`,
-  );
 
   const fingerprint = await seedFingerprint({
     workspace,
     workspaceRoot,
     entries,
-    closureModulesDir: runtimeModulesDir,
+    closureModulesDir: join(deployRoot, "node_modules"),
     seedRoot: seedOutputRoot,
   });
   await writeFile(join(profileDir, SEED_HASH_NAME), fingerprint);
@@ -470,29 +486,6 @@ export function profileLocalBundles(manifest: WorkspaceManifest): string[] {
 // （实测 `pnpm install` 只装直接依赖，一条告警都没有），于是 profile 里那些 bundle 的行引到
 // `@morlay/*` 时整个 `failed to import`。上游包（`@deepseek-ai/*`）不进这份清单：它们由 runtime 的
 // 解析锚点提供，抄进 profile 只是把同一份源码再复制一遍。
-async function withLocalClosure(
-  runtimeModulesDir: string,
-  roots: readonly string[],
-): Promise<string[]> {
-  const packages = [...roots];
-  const seen = new Set(packages);
-  const queue = [...roots];
-  while (queue.length > 0) {
-    const name = queue.shift() as string;
-    const manifest = JSON.parse(
-      await readFile(join(runtimeModulesDir, ...name.split("/"), "package.json"), "utf8"),
-    ) as { dependencies?: Record<string, string> };
-    for (const dependency of Object.keys(manifest.dependencies ?? {})) {
-      if (seen.has(dependency) || dependency.startsWith("@deepseek-ai/")) continue;
-      if (!(await pathExists(join(runtimeModulesDir, ...dependency.split("/"), "package.json"))))
-        continue;
-      seen.add(dependency);
-      packages.push(dependency);
-      queue.push(dependency);
-    }
-  }
-  return packages;
-}
 
 // Generate the profile manifest: app identity plus the assembly rows it declares.
 //

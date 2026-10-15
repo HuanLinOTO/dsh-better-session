@@ -26,10 +26,6 @@ import {
   desktopScheme,
 } from "./ipc.ts";
 import {
-  PROFILE_WORKSPACE_NAME,
-  installProfile,
-  runtimeOverrides,
-  workspaceWithOverrides,
 } from "./profile-project.ts";
 import { SEED_RUNTIME_DIR_NAME, ensureSeedProfile } from "./seed.ts";
 import { installDesktopShortcuts } from "./shortcuts.ts";
@@ -137,40 +133,6 @@ function runtimeResources(): RuntimeResources {
     // 它）。不再由工具注入路径，也不依赖"随包 runtime 里那份拷贝"的布局。
     loader: fileURLToPath(import.meta.resolve("@local/oxc-node")),
   };
-}
-
-/**
- * 让 profile 的依赖指向**当前**这份运行时，**每次启动**都做。
- *
- * profile 住在 `$DSH_HOME`（用户数据，跨应用路径），而它的依赖经 `overrides` 的 `link:` 指到随包运行时
- * ——那个位置**只有现在这一刻**才知道（应用可以被挪到别的目录）。所以这份 `link:` 必须动态算，不能靠
- * "种的那一次"写死：内容没变就什么都不做，变了才重装一次（离线安装，增量的）。
- */
-async function refreshProfileLinks(
-  profileDir: string,
-  resources: RuntimeResources,
-): Promise<void> {
-  const settingsPath = join(profileDir, PROFILE_WORKSPACE_NAME);
-  const overrides = await runtimeOverrides(profileDir, resources.runtime);
-  const current = await readFile(settingsPath, "utf8");
-  const next = workspaceWithOverrides(current, overrides);
-  // profile 的 `dependencies` 也在这里补：清单里只声明了"要哪些装配行"，来源是**当前这份运行时**的
-  // 绝对位置（相对路径在这里没有稳定解），写成 `link:` 就不必去 registry 解析。
-  const manifestPath = join(profileDir, "package.json");
-  const manifestText = await readFile(manifestPath, "utf8");
-  const manifest = JSON.parse(manifestText) as { dependencies?: Record<string, string> };
-  const dependencies = Object.fromEntries(
-    overrides.map((entry) => [entry.name, `link:${entry.target}`]),
-  );
-  const dependencyText = `${JSON.stringify({ ...manifest, dependencies }, undefined, 2)}\n`;
-  if (next === current && dependencyText === manifestText) return;
-  if (next !== current) await writeFile(settingsPath, next);
-  await writeFile(manifestPath, dependencyText);
-  await installProfile({
-    node: resources.node,
-    pnpmEntry: resources.pnpm,
-    profileDir,
-  });
 }
 
 // dev 形态的两格：profile root（app 目录本身）与安装根（官方闭包、前端产物与 host 载荷的来源）。
@@ -335,10 +297,9 @@ async function main(): Promise<void> {
   if (development === undefined) {
     if (dataDir === undefined)
       throw new Error("dsh desktop: packaged applications require a concrete dataDir");
-    // 重种换的是**装配面**；装那一步不在这儿做——紧接着的 `refreshProfileLinks` 会把依赖写上并装一次
-    // （刚重种出来的清单里没有 `dependencies`，它一定认为需要装）。
+    // 重种换的是**装配面**（清单 + 那份依赖归档）；依赖由 `ensureSeedProfile` 解压成实体闭包，
+    // 这里**不再**改写 profile 的清单、也不再跑一次 install。
     await ensureSeedProfile(resources.seed, dataDir);
-    await refreshProfileLinks(profileDir, resources);
   }
   // **两种形态都不要求上游的前端静态产物**：页面与资源由这条链（vite + 联邦预编译，见
   // `@morlay/dsh-client-modules`）在宿主进程里现场提供，壳只是把请求经字节管道交给它。所以这里不再检查
@@ -396,6 +357,8 @@ async function main(): Promise<void> {
     const loader = sourceLoader(resources);
     const next = new DesktopHostProcess(resources.node, runtimeDir, target, hostInspectPort, {
       nodeArgs: [`--import=${loader}`],
+      // 宿主输出落盘：打包形态 GUI 里看不到它的 stdout/stderr，而"少服务/某个 bundle 没起来"的原因就在那里。
+      logFile: join(dataDir ?? join(process.cwd(), ".dsh-store"), "logs", "host.log"),
       // 宿主入口一律按 node 的解析取**源码**（`@morlay/dsh-desktop-host` 的 exports 指 `src/index.ts`，
       // 由上面的 loader 转译）：两种形态同一条路，部署里不必再落一份 dist 载荷。
       //
