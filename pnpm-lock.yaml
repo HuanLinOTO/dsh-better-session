@@ -224,9 +224,6 @@ importers:
       oxlint-tsgolint:
         specifier: 7.x
         version: 7.0.2004
-      postcss:
-        specifier: ^8.5.29
-        version: 8.5.30
       react:
         specifier: 18.x
         version: 18.3.1
