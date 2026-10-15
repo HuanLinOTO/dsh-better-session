@@ -339,15 +339,9 @@ importers:
       '@deepseek-ai/dsh-app-boot':
         specifier: workspace:*
         version: link:../../vendor/deepseek-harness/packages/boot/app-boot
-      '@morlay/dsh-desktop-host':
-        specifier: workspace:*
-        version: link:../../packages/desktop/dsh-desktop-host
       '@morlay/dsh-desktop-shell':
         specifier: workspace:*
         version: link:../../packages/desktop/dsh-desktop-shell
-      '@morlay/web-custom-profile':
-        specifier: workspace:*
-        version: link:../../packages/bundles/web-custom-profile
       commander:
         specifier: ^15.0.0
         version: 15.0.0

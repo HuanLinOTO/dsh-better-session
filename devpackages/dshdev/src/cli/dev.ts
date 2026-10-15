@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
-import { access, mkdir } from "node:fs/promises";
+import { access, mkdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { writeAppConfig } from "@morlay/dsh-desktop-shell/appconfig";
 import { DESKTOP_HOST_PACKAGE } from "@morlay/dsh-desktop-shell/official";
 import { devRuntimeRoot, requireDevRuntime } from "./dev-layout.ts";
@@ -85,13 +85,24 @@ async function webEntry(): Promise<string> {
 
 // 源码 client 半「现场打包」那条行的定义只有一份：宿主包里的 overlay（它按相对路径指自己的 `lib/`）。
 // 桌面形态由宿主自己挂；web 形态的 profile 就是 app 目录，宿主那层拿不到，所以这里按 `--patch` 挂上。
-async function devClientPatch(): Promise<string> {
-  // dev 形态的前端装配层（挂 `@morlay/dsh-client-modules`、停上游那几行）由一个 dev-only bundle 提供：
+async function devClientPatch(workspace: string): Promise<string> {
+  // dev 形态的前端装配层（挂 `@morlay/dsh-client-modules`、停上游那几行）由 **app 自己的一个 bundle** 提供：
   // web 与桌面两种形态挂的是**同一份** patch。
-  const patch = fileURLToPath(import.meta.resolve("@morlay/web-custom-profile/cordis.patch.yml"));
-  if (!(await pathExists(patch)))
-    throw new Error(`desktop development: missing ${patch}; run the tool build (pnpm build)`);
-  return patch;
+  //
+  // **从 app 的 `dsh.profile.bundles` 里找**（按 app 的解析面），不在工具里写死包名——那个 bundle 是 app 的
+  // 依赖，工具多一条直接依赖只会在上游改名时多一处要改的地方。
+  const root = resolve(workspace);
+  const manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as {
+    dsh?: { profile?: { bundles?: string[] } };
+  };
+  const from = pathToFileURL(join(root, "package.json")).href;
+  for (const bundle of manifest.dsh?.profile?.bundles ?? []) {
+    const patch = fileURLToPath(import.meta.resolve(`${bundle}/cordis.patch.yml`, from));
+    if (await pathExists(patch)) return patch;
+  }
+  throw new Error(
+    `desktop development: no bundle in ${root}/package.json 的 dsh.profile.bundles 提供 cordis.patch.yml`,
+  );
 }
 
 /**
@@ -227,7 +238,7 @@ export async function runDev(options: DevOptions): Promise<void> {
         profileRoot,
         "--runtime-dir",
         activeRuntimeDir,
-        ...(prod === undefined ? ["--patch", await devClientPatch()] : []),
+        ...(prod === undefined ? ["--patch", await devClientPatch(workspace)] : []),
       ],
       repositoryRoot,
       withTsLoader(

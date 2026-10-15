@@ -22,10 +22,11 @@ import type { RunProfileOptions } from "@deepseek-ai/dsh/profile-boot";
 /** One booted app profile: the settled root context and its shutdown controller. */
 export type AppProfileBoot = Awaited<ReturnType<typeof runProfile>>;
 
-// **解析锚点 = profile 自己的 `node_modules`**：官方 bundles 与 `dsh` 都由它解析。
+// **解析锚点 = profile 自己的清单**。
 //
-// 以前指 `<runtimeDir>/node_modules/@deepseek-ai/dsh/package.json`——那是 runtime 还带着一份完整闭包的年代。
-// runtime 现在只放工具链（`node` / `pnpm` / loader），依赖面由随包 tar 解压进 profile，锚点跟着那份走。
+// 上游 `resolveBundleDir` 是两轮：先 `installAnchor`、再 `<profileDir>/package.json`——那是"官方安装面与
+// profile 面分开"的年代的形状。完整闭包整体解压进 profile 之后两面合一：没有另一个安装面可指，锚点就是
+// profile 自己（`@deepseek-ai/dsh` 也在它的 `node_modules` 里）。
 /**
  * 闭包根（安装锚点）：官方 bundles 与 `dsh` 都由它解析。
  *
@@ -33,7 +34,7 @@ export type AppProfileBoot = Awaited<ReturnType<typeof runProfile>>;
  * @returns 锚点清单的绝对路径。
  */
 export function installAnchorOf(profileDir: string): string {
-  return join(profileDir, "node_modules", "@deepseek-ai", "dsh", "package.json");
+  return join(profileDir, "package.json");
 }
 
 /** Inputs for one app profile boot. */
