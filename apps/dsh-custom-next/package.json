@@ -3,22 +3,25 @@
   "version": "0.2.1",
   "private": true,
   "files": [
-    "icon.svg",
-    "justfile"
+    "icon.svg"
   ],
   "type": "module",
   "exports": {
     "./package.json": "./package.json"
   },
   "dependencies": {
+    "@deepseek-ai/dsh-base": "workspace:*",
+    "@deepseek-ai/dsh-web-app": "workspace:*",
     "@morlay/better-session": "workspace:*",
+    "@morlay/dsh-client-modules": "workspace:*",
     "@morlay/mydsh-profile": "workspace:*",
     "@morlay/ollama-provider-profile": "workspace:*",
     "@morlay/sandbox-profile": "workspace:*",
-    "@morlay/session-mode-profile": "workspace:*"
+    "@morlay/session-mode-profile": "workspace:*",
+    "@morlay/web-custom-profile": "workspace:*"
   },
   "peerDependencies": {
-    "@morlay/dsh-desktopify": "workspace:*"
+    "@local/dshdev": "workspace:*"
   },
   "dsh": {
     "version": "workspace:*",
@@ -26,6 +29,7 @@
       "bundles": [
         "@deepseek-ai/dsh-base",
         "@deepseek-ai/dsh-web-app",
+        "@morlay/web-custom-profile",
         "@morlay/better-session",
         "@morlay/ollama-provider-profile",
         "@morlay/sandbox-profile",
@@ -44,7 +48,12 @@
         "minWidth": 800,
         "minHeight": 600
       },
-      "dshHome": "xdg"
+      "dataDir": "xdg"
+    },
+    "dev": {
+      "exclude": [
+        "@deepseek-ai/*"
+      ]
     }
   }
 }

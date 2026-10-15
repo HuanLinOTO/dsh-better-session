@@ -1,0 +1,32 @@
+# 源码面的 client 半：`@deepseek-ai/*` 与本仓库插件包的 `exports["./client"]` 都指到 `src/client/index.ts`，
+# 而 `client-modules` 只会把那个文件当 JS 原样下发——所以要有人把源码半现场打成模块表的工厂脚本。
+# 判据与实现见 [`src/`](../src/index.ts)。
+#
+# 这一层由**两种形态共享**：`dsh-desktopify dev`（web / 桌面）都用 `--patch` 挂它，桌面档还会再叠
+# `desktop.cordis.patch.yml`。宿主进程由 `--import @oxc-node/core/register` 转译，所以这里直接指 TS 源码。
+- insert:
+    - id: client-modules
+      name: "@morlay/dsh-client-modules"
+
+# `web-runtime` 挂着 `frontend-static`（服务**构建产物**里的 index.html，占兜底位）——dev 形态下页面与资源
+# 全归 vite，这一行连同它挂的兜底一起用不到；而且兜底位只有一个，留着它 vite 就没位置可占。
+- id: web-runtime
+  disabled: true
+
+# 上游这两行在 dev 形态下用不到，**整行停用**（含它们提供的服务）：
+# · `client-modules`——combo 打包、工厂引导器、`/plugins` 路由与**模块表 roster**（`modules` 服务）都在
+#   这一行。页面、入口、资源与依赖预打包由 vite dev server 提供，模块表那一套不再需要；
+# · `client-hmr`——热替换由 vite 的通道接管。
+#
+- id: modules
+  disabled: true
+- id: client-hmr
+  disabled: true
+
+# **插件管理页保留**（`ui-plugin-manager`：它只依赖 `remote.pluginManager*` 那几个 remote 面，
+# 不依赖被停用的模块表）；停的只是**设置页里的插件清单**——那两行要 `modules` 服务
+# （模块表 roster）与 bundle 清单，模块表已随 `client-modules` 退场，留着只会是空页。
+- id: ui-settings-plugin-inventory
+  disabled: true
+- id: ui-settings-plugins
+  disabled: true
