@@ -502,7 +502,13 @@ async function bundlePackageOnce(options: BundleOptions, key: string): Promise<B
       },
     },
     browserProcessPlugin(),
-    cssInlinePlugins({ name: key, assets: "threshold" }),
+    cssInlinePlugins({
+      name: key,
+      assets: "threshold",
+      // 资产地址要是**联邦地址**：`assets/…` 只相对页面，而这条链的资产由我们自己的路由按
+      // `/@client-modules/<pkg>@<ver>/assets/…` 服务（清单是唯一真相）。
+      assetUrl: (file) => `${CLIENT_MODULES_PREFIX}/${key}/${file}`,
+    }),
     clientAssetPlugin({ assets: "threshold" }),
     // 外置**全部裸说明符**（`node:*` 除外——它走 `clientAssetPlugin` 的浏览器替身）。
     //

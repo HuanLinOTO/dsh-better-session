@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { rolldown } from "rolldown";
 import type { Plugin } from "rolldown";
 import { clientAssetPlugin, NODE_BUILTIN } from "./assets.ts";
-import { cssInlinePlugins } from "./css.ts";
+import { cssInlinePlugins, type CssAssetPolicy } from "./css.ts";
 
 // 资产那套（mime 表、`?raw`、资产内联/落文件）的 home 在 `@morlay/dsh-client-modules/src/assets.ts`——
 // 运行期现场打包与这里的构建共用一份；下面只把名字转出来，外部 import 面不变。
@@ -162,6 +162,20 @@ export interface ClientFactoryOptions {
   mode?: string;
   // 打包工作目录（默认 `process.cwd()`）。
   cwd?: string;
+  // 资产策略：`inline`（缺省；自包含单文件，没有放资产的位置）或 `threshold`（大图落成 `assets/` 文件，
+  // 联邦链走这一支）。
+  assets?: CssAssetPolicy;
+  // 资产文件名 → 它在浏览器里的地址（联邦链给绝对地址，缺省是文件名本身）。
+  assetUrl?: (fileName: string) => string;
+}
+
+/** 样式插件的选项：把策略与地址透传下去（缺省 `inline`，与"自包含单文件"的历史行为一致）。 */
+function stylePlugins(options: ClientFactoryOptions): Plugin[] {
+  return cssInlinePlugins({
+    name: options.name,
+    assets: options.assets ?? "inline",
+    ...(options.assetUrl === undefined ? {} : { assetUrl: options.assetUrl }),
+  });
 }
 
 // 现场把一份 client 半打成 `__ModuleLoader__.load` 注册脚本文本（不含 source map），供开发态直载；
@@ -187,7 +201,7 @@ export async function bundleClientFactory(options: ClientFactoryOptions): Promis
     treeshake: { moduleSideEffects: "no-external" },
     // 样式内联进字节：产物是自包含单文件，样式不能留在外部（见 cssInlinePlugins）。
     // 资产同样内联：单文件没有放资产的位置（发布线也是这一支，见债务「CSS 大图资产化」）。
-    plugins: [...cssInlinePlugins({ name: options.name, assets: "inline" }), clientAssetPlugin()],
+    plugins: [...stylePlugins(options), clientAssetPlugin()],
   });
   try {
     const { output } = await build.generate({
@@ -231,7 +245,7 @@ export async function bundleClientLibrary(options: {
     treeshake: false,
     // 样式与资产照旧内联成"模块执行即注入 + 导出 class 映射"：rolldown 不再支持把 CSS 当资源打包，
     // 不处理就是 `UNSUPPORTED_FEATURE: Bundling CSS is no longer supported`。
-    plugins: [...cssInlinePlugins({ name: options.name, assets: "inline" }), clientAssetPlugin()],
+    plugins: [...stylePlugins(options), clientAssetPlugin()],
   });
   try {
     const { output } = await build.generate({

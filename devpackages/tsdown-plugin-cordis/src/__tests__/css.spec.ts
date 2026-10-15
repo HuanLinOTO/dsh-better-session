@@ -15,6 +15,7 @@ const PLUGIN_ID = "@morlay/devkit-css-fixture";
 const FIXTURE_ENTRY = `import classes from "./styles/Fixture.module.css";
 import inlined from "./styles/inline-only.css?inline";
 import "./styles/global.css";
+import "./styles/Whale.module.css";
 export { classes, inlined };
 `;
 
@@ -26,6 +27,12 @@ const GLOBAL_CSS = `body { margin: 0; }
 `;
 
 const INLINE_CSS = `:root { --gap: 4px; }
+`;
+
+// 掩膜图：`@supports` 内层 + `mask` 简写引用一张大图（≥ 4KB → 走资产文件而不是内联）。
+const WHALE_CSS = `@supports (mask-mode: alpha) and (mask-image: url('')) {
+  .whale { mask: url('./big.png') center / 100% 100% no-repeat; }
+}
 `;
 
 interface Registered {
@@ -76,6 +83,8 @@ describe("client bundle CSS", () => {
     await writeFile(join(directory, "styles", "Fixture.module.css"), MODULE_CSS);
     await writeFile(join(directory, "styles", "global.css"), GLOBAL_CSS);
     await writeFile(join(directory, "styles", "inline-only.css"), INLINE_CSS);
+    await writeFile(join(directory, "styles", "Whale.module.css"), WHALE_CSS);
+    await writeFile(join(directory, "styles", "big.png"), Buffer.alloc(5000, 7));
     await writeFile(join(directory, "entry.ts"), FIXTURE_ENTRY);
   });
   afterAll(async () => {
@@ -110,6 +119,21 @@ describe("client bundle CSS", () => {
     it("inlines a global stylesheet into a style tag with no class map", () => {
       runFactory(code);
       expect(injectedCss("global.css")).toBe("body{margin:0}");
+    });
+
+    it("`@supports` 里的大图落成资产，产物引用文件名而不是 emitFile 的引用 id", async () => {
+      await writeFile(join(directory, "whale-entry.ts"), 'import "./styles/Whale.module.css";\n');
+      const thresholdCode = await bundleClientFactory({
+        name: PLUGIN_ID,
+        entry: join(directory, "whale-entry.ts"),
+        assets: "threshold",
+        assetUrl: (file) => `/@client-modules/demo@1.0.0/${file}`,
+      });
+
+      // 资产文件名（`assets/big-<hash>.png`）。`emitFile` 的返回值是 rollup 的**引用 id**
+      // （形如 `VRAku6fjghkApIISiBWPzg`）——拿它当 URL 就是"资产在盘上、页面却不显示"。占位也必须被换掉。
+      expect(thresholdCode).toMatch(/\/@client-modules\/demo@1\.0\.0\/assets\/big-[A-Za-z0-9_-]+\.png/);
+      expect(thresholdCode).not.toContain("__DSH_ASSET_");
     });
 
     it("exports the compiled text of a `?inline` stylesheet and injects nothing", () => {

@@ -50,35 +50,31 @@ const CSS_ASSET_MIME: Record<string, string> = {
  * @param emit - 大图落文件时给出它的 URL。
  * @returns 处理后的样式文本。
  */
-export async function rewriteCssUrls(
+async function urlReplacements(
   css: string,
   from: string,
   policy: CssAssetPolicy = "threshold",
   emit?: (name: string, bytes: Uint8Array) => string,
-): Promise<string> {
-  const collect = (visitor: (specifier: string) => void): Visitor<never> => ({
-    Url(url) {
-      visitor(url.url);
-    },
-  });
-
-  // 第一趟：收集（跳过 data: / 外链 / 片段）。
+): Promise<Map<string, string>> {
+  // 先收集要处理的 url（跳过 data: / 外链 / 片段）。
   const specifiers = new Set<string>();
   transform({
     filename: from,
     code: Buffer.from(css),
-    visitor: collect((specifier) => {
-      if (
-        !specifier.startsWith("data:") &&
-        !/^(?:https?:)?\/\//u.test(specifier) &&
-        !specifier.startsWith("#")
-      ) {
-        specifiers.add(specifier);
-      }
-    }),
+    visitor: {
+      Url(url) {
+        const specifier = url.url;
+        if (
+          !specifier.startsWith("data:") &&
+          !/^(?:https?:)?\/\//u.test(specifier) &&
+          !specifier.startsWith("#")
+        ) {
+          specifiers.add(specifier);
+        }
+      },
+    },
   });
 
-  // 异步读：值算好之后第二趟只做替换（visitor 本身同步）。
   const replacements = new Map<string, string>();
   for (const specifier of specifiers) {
     const file = resolvePath(dirname(from), specifier);
@@ -98,18 +94,44 @@ export async function rewriteCssUrls(
     const mime = CSS_ASSET_MIME[extension] ?? "application/octet-stream";
     replacements.set(specifier, `data:${mime};base64,${bytes.toString("base64")}`);
   }
-  if (replacements.size === 0) return css;
+  return replacements;
+}
 
-  // 第二趟：替换（展开原对象，只换 url 字段）。
+/** `url()` 的替换 visitor：**必须挂在最终那一趟 `transform` 上**（见 `compileCssModule` 的注释）。 */
+function urlVisitor(replacements: ReadonlyMap<string, string>): Visitor<never> {
+  return {
+    Url(url) {
+      const next = replacements.get(url.url);
+      return next === undefined ? undefined : { ...url, url: next };
+    },
+  };
+}
+
+/**
+ * 样式里 `url('./x.png')` 这类**文件引用**的处理：小图内联成 data URI，大图产出资产文件（发布链）。
+ *
+ * 用 lightningcss 的 `url()` 钩子而不是正则扫文本：`url()` 会出现在 `@supports` 内层、`mask` / `mask-image`
+ * 简写、`image-set()`、`@font-face` 里，文本正则漏一处就是一张图凭空消失。钩子是**同步**的，所以分两趟；
+ * 这条导出是"改文本"的形态（单测直接打它），编译函数则把替换合进它自己那一趟。
+ *
+ * @param css - 样式文本。
+ * @param from - 样式文件路径（解析相对路径用）。
+ * @param policy - 资产策略（`threshold` 时超过 {@link INLINE_LIMIT} 的走 `emit`）。
+ * @param emit - 大图落文件时给出它的 URL。
+ * @returns 处理后的样式文本。
+ */
+export async function rewriteCssUrls(
+  css: string,
+  from: string,
+  policy: CssAssetPolicy = "threshold",
+  emit?: (name: string, bytes: Uint8Array) => string,
+): Promise<string> {
+  const replacements = await urlReplacements(css, from, policy, emit);
+  if (replacements.size === 0) return css;
   const { code } = transform({
     filename: from,
     code: Buffer.from(css),
-    visitor: {
-      Url(url) {
-        const next = replacements.get(url.url);
-        return next === undefined ? undefined : { ...url, url: next };
-      },
-    },
+    visitor: urlVisitor(replacements),
   });
   return code.toString();
 }
@@ -149,25 +171,47 @@ export function compileStyleModule(options: {
   return source.join("\n");
 }
 
-/** 编译 CSS Modules：lightningcss 出 class 映射与压缩后的文本（`[hash]_[local]` 与上游同形）。 */
-export async function compileCssModule(file: string, source: string): Promise<string> {
+/**
+ * 编译 CSS Modules：lightningcss 出 class 映射与文本（`[hash]_[local]` 与上游同形）。
+ *
+ * `url()` 的替换**挂在这一趟上**：lightningcss 自己也会重写 `url()`（把文件当它的资产、换成裸 hash，
+ * 如 `url(VRAku6fjghkApIISiBWPzg)`），在它之前改文本会被它覆盖——那正是"掩膜图有资产、页面却不显示"。
+ *
+ * @param file - 样式文件路径。
+ * @param source - 样式文本。
+ * @param options - `minify`（发布链与上游同步开、日常关）、资产策略与 `emit`。
+ * @returns 可直接下发的 ESM 模块源码。
+ */
+export async function compileCssModule(
+  file: string,
+  source: string,
+  options: { minify?: boolean; assets?: CssAssetPolicy; emit?: (name: string, bytes: Uint8Array) => string } = {},
+): Promise<string> {
+  const replacements = await urlReplacements(source, file, options.assets, options.emit);
   const { code, exports } = transform({
     filename: file,
-    code: Buffer.from(await rewriteCssUrls(source, file)),
+    code: Buffer.from(source),
     cssModules: { pattern: "[hash]_[local]" },
-    minify: true,
+    minify: options.minify ?? true,
+    visitor: urlVisitor(replacements),
   });
   const classMap: Record<string, string> = {};
   for (const [local, entry] of Object.entries(exports ?? {})) classMap[local] = entry.name;
   return compileStyleModule({ file, css: code.toString(), name: PLUGIN_STYLE_NAME, classMap });
 }
 
-/** 编译全局样式（无 class 映射）。 */
-export async function compileGlobalCss(file: string, source: string): Promise<string> {
+/** 编译全局样式（无 class 映射）：`url()` 与 `minify` 的取舍同 {@link compileCssModule}。 */
+export async function compileGlobalCss(
+  file: string,
+  source: string,
+  options: { minify?: boolean; assets?: CssAssetPolicy; emit?: (name: string, bytes: Uint8Array) => string } = {},
+): Promise<string> {
+  const replacements = await urlReplacements(source, file, options.assets, options.emit);
   const { code } = transform({
     filename: file,
-    code: Buffer.from(await rewriteCssUrls(source, file)),
-    minify: true,
+    code: Buffer.from(source),
+    minify: options.minify ?? true,
+    visitor: urlVisitor(replacements),
   });
   return compileStyleModule({ file, css: code.toString(), name: PLUGIN_STYLE_NAME });
 }
@@ -185,7 +229,28 @@ export type CssAssetPolicy = "inline" | "threshold";
 /** 内联阈值（与 vite 的 `assetsInlineLimit` 同一个量级）：超过它就产出独立资产文件。 */
 export const INLINE_LIMIT = 4096;
 
-export function cssInlinePlugins(options: { name: string; assets?: CssAssetPolicy }): Plugin[] {
+export function cssInlinePlugins(options: {
+  name: string;
+  assets?: CssAssetPolicy;
+  /** 压缩样式文本：**发布链与上游同步开**（上游 `tsdown.client.ts` 三处都是 `minify: true`），日常别开。 */
+  minify?: boolean;
+  /**
+   * 资产文件名 → 它在**浏览器里**的地址。
+   *
+   * 缺省是文件名本身（`assets/x.png`，相对页面）；联邦链要的是绝对地址
+   * （`/@client-modules/<pkg>@<ver>/assets/x.png`），由调用方给。
+   */
+  assetUrl?: (fileName: string) => string;
+}): Plugin[] {
+  // **资产占位**：`this.emitFile` 返回的是**引用 id**（rollup 的内部串，形如 `VRAku6fjghkApIISiBWPzg`），
+  // 不是文件名——文件名要到 `generateBundle` 才拿得到。以前把这个 id 直接当 URL 写进 CSS，于是资产在盘上、
+  // 清单里有、URL 却是个无意义标识（掩膜图就这么不显示）。现在先写占位，收尾统一换成真名。
+  const pendingAssets = new Map<string, { name: string; bytes: Uint8Array }>();
+  const placeholderFor = (name: string, bytes: Uint8Array): string => {
+    const placeholder = `__DSH_ASSET_${String(pendingAssets.size)}__`;
+    pendingAssets.set(placeholder, { name, bytes });
+    return placeholder;
+  };
   const styleModule = (
     file: string,
     css: string,
@@ -213,6 +278,30 @@ export function cssInlinePlugins(options: { name: string; assets?: CssAssetPolic
 
   return [
     {
+      // **收尾**：这时 `emitFile` + `getFileName` 才拿得到真实文件名（`assets/x-<hash>.png`）。
+      name: "dsh-css-assets",
+      generateBundle(_options, bundle) {
+        const urls = new Map<string, string>();
+        for (const [placeholder, asset] of pendingAssets) {
+          const reference = this.emitFile({
+            type: "asset",
+            name: asset.name,
+            source: asset.bytes,
+            originalFileName: asset.name,
+          });
+          const file = this.getFileName(reference);
+          urls.set(placeholder, options.assetUrl === undefined ? file : options.assetUrl(file));
+        }
+        if (urls.size === 0) return;
+        for (const item of Object.values(bundle)) {
+          if (item.type !== "chunk") continue;
+          let code = item.code;
+          for (const [placeholder, url] of urls) code = code.replaceAll(placeholder, url);
+          item.code = code;
+        }
+      },
+    },
+    {
       name: "dsh-css-modules-inline",
       resolveId: {
         // rolldown 在默认顺序的钩子之前剥离 import query、再把它拼回返回的 id；pre 才拿得到
@@ -226,17 +315,19 @@ export function cssInlinePlugins(options: { name: string; assets?: CssAssetPolic
       async load(virtualId: string) {
         if (!virtualId.startsWith(MODULES_PREFIX)) return null;
         const emitAsset = (assetName: string, bytes: Uint8Array): string =>
-          this.emitFile({ type: "asset", name: assetName, source: bytes, originalFileName: assetName });
+          placeholderFor(assetName, bytes);
         const file = unwrap(virtualId, MODULES_PREFIX);
         // 虚拟 id 让真实样式文件落在 rolldown 的 watch 图之外，这里补回来。
         this.addWatchFile(file);
+        const source = await readFile(file);
+        // `url()` 的替换挂到**这一趟**：在它之前改文本会被 lightningcss 自己重写成裸 hash。
+        const replacements = await urlReplacements(source.toString(), file, options.assets, emitAsset);
         const { code, exports } = transform({
           filename: file,
-          code: Buffer.from(
-            await rewriteCssUrls(await readFile(file, "utf8"), file, options.assets, emitAsset),
-          ),
+          code: source,
           cssModules: { pattern: "[hash]_[local]" },
-          minify: true,
+          minify: options.minify ?? true,
+          visitor: urlVisitor(replacements),
         });
         const classMap: Record<string, string> = {};
         for (const [local, entry] of Object.entries(exports ?? {})) classMap[local] = entry.name;
@@ -258,13 +349,14 @@ export function cssInlinePlugins(options: { name: string; assets?: CssAssetPolic
         const file = unwrap(virtualId, INLINE_PREFIX);
         this.addWatchFile(file);
         const emitAsset = (assetName: string, bytes: Uint8Array): string =>
-          this.emitFile({ type: "asset", name: assetName, source: bytes, originalFileName: assetName });
+          placeholderFor(assetName, bytes);
+        const source = await readFile(file);
+        const replacements = await urlReplacements(source.toString(), file, options.assets, emitAsset);
         const { code } = transform({
           filename: file,
-          code: Buffer.from(
-            await rewriteCssUrls(await readFile(file, "utf8"), file, options.assets, emitAsset),
-          ),
-          minify: true,
+          code: source,
+          minify: options.minify ?? true,
+          visitor: urlVisitor(replacements),
         });
         return `export default ${JSON.stringify(code.toString())};`;
       },
@@ -283,13 +375,14 @@ export function cssInlinePlugins(options: { name: string; assets?: CssAssetPolic
         const file = unwrap(virtualId, GLOBAL_PREFIX);
         this.addWatchFile(file);
         const emitAsset = (assetName: string, bytes: Uint8Array): string =>
-          this.emitFile({ type: "asset", name: assetName, source: bytes, originalFileName: assetName });
+          placeholderFor(assetName, bytes);
+        const source = await readFile(file);
+        const replacements = await urlReplacements(source.toString(), file, options.assets, emitAsset);
         const { code } = transform({
           filename: file,
-          code: Buffer.from(
-            await rewriteCssUrls(await readFile(file, "utf8"), file, options.assets, emitAsset),
-          ),
-          minify: true,
+          code: source,
+          minify: options.minify ?? true,
+          visitor: urlVisitor(replacements),
         });
         return styleModule(file, code.toString());
       },
