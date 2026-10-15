@@ -6,7 +6,7 @@
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, dirname, resolve as resolvePath } from "node:path";
-import { transform } from "lightningcss";
+import { transform, type Visitor } from "lightningcss";
 import type { Plugin } from "rolldown";
 
 // 虚拟 id 与上游 client 构建（vendor 的 tsdown.client.ts）同前缀同后缀：两条链的语义一致，
@@ -36,36 +36,82 @@ const CSS_ASSET_MIME: Record<string, string> = {
   otf: "font/otf",
 };
 
-async function inlineCssUrls(
+/**
+ * 样式里 `url('./x.png')` 这类**文件引用**的处理：小图内联成 data URI，大图产出资产文件（发布链）。
+ *
+ * 用 lightningcss 的 `url()` 钩子而不是正则扫文本：`url()` 会出现在 `@supports` 内层、`mask` / `mask-image`
+ * 简写、`image-set()`、`@font-face` 里，文本正则漏一处就是一张图凭空消失（`ui-chat` 的 running-whale 掩膜图
+ * 就是这么丢的）。钩子是**同步**的，所以分两趟：**先收集**要处理的 url，异步读文件算好替换值，
+ * 再跑一趟**只做替换**。
+ *
+ * @param css - 样式文本。
+ * @param from - 样式文件路径（解析相对路径用）。
+ * @param policy - 资产策略（`threshold` 时超过 {@link INLINE_LIMIT} 的走 `emit`）。
+ * @param emit - 大图落文件时给出它的 URL。
+ * @returns 处理后的样式文本。
+ */
+export async function rewriteCssUrls(
   css: string,
   from: string,
   policy: CssAssetPolicy = "threshold",
   emit?: (name: string, bytes: Uint8Array) => string,
 ): Promise<string> {
-  const matches = [...css.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gu)];
-  let result = css;
-  for (const match of matches) {
-    const specifier = match[1];
-    if (specifier === undefined) continue;
-    if (specifier.startsWith("data:") || /^(?:https?:)?\/\//u.test(specifier) || specifier.startsWith("#")) {
-      continue;
-    }
-    const file = resolvePath(dirname(from), specifier);
-    try {
-      const bytes = await readFile(file);
-      const extension = (file.split(".").pop() ?? "").toLowerCase();
-      if (policy === "threshold" && bytes.byteLength >= INLINE_LIMIT && emit !== undefined) {
-        // 大图产出资产文件（发布链），URL 指向它而不是塞 base64。
-        result = result.replaceAll(match[0], `url("${emit(basename(file), bytes)}")`);
-        continue;
+  const collect = (visitor: (specifier: string) => void): Visitor<never> => ({
+    Url(url) {
+      visitor(url.url);
+    },
+  });
+
+  // 第一趟：收集（跳过 data: / 外链 / 片段）。
+  const specifiers = new Set<string>();
+  transform({
+    filename: from,
+    code: Buffer.from(css),
+    visitor: collect((specifier) => {
+      if (
+        !specifier.startsWith("data:") &&
+        !/^(?:https?:)?\/\//u.test(specifier) &&
+        !specifier.startsWith("#")
+      ) {
+        specifiers.add(specifier);
       }
-      const mime = CSS_ASSET_MIME[extension] ?? "application/octet-stream";
-      result = result.replaceAll(match[0], `url("data:${mime};base64,${bytes.toString("base64")}")`);
+    }),
+  });
+
+  // 异步读：值算好之后第二趟只做替换（visitor 本身同步）。
+  const replacements = new Map<string, string>();
+  for (const specifier of specifiers) {
+    const file = resolvePath(dirname(from), specifier);
+    let bytes: Buffer;
+    try {
+      bytes = await readFile(file);
     } catch {
       // 找不到的文件保持原样：让浏览器按原路径报错，比静默吞掉更好定位。
+      continue;
     }
+    const extension = (file.split(".").pop() ?? "").toLowerCase();
+    if (policy === "threshold" && bytes.byteLength >= INLINE_LIMIT && emit !== undefined) {
+      // 大图产出资产文件（发布链），URL 指向它而不是塞 base64。
+      replacements.set(specifier, emit(basename(file), bytes));
+      continue;
+    }
+    const mime = CSS_ASSET_MIME[extension] ?? "application/octet-stream";
+    replacements.set(specifier, `data:${mime};base64,${bytes.toString("base64")}`);
   }
-  return result;
+  if (replacements.size === 0) return css;
+
+  // 第二趟：替换（展开原对象，只换 url 字段）。
+  const { code } = transform({
+    filename: from,
+    code: Buffer.from(css),
+    visitor: {
+      Url(url) {
+        const next = replacements.get(url.url);
+        return next === undefined ? undefined : { ...url, url: next };
+      },
+    },
+  });
+  return code.toString();
 }
 
 /**
@@ -107,7 +153,7 @@ export function compileStyleModule(options: {
 export async function compileCssModule(file: string, source: string): Promise<string> {
   const { code, exports } = transform({
     filename: file,
-    code: Buffer.from(await inlineCssUrls(source, file)),
+    code: Buffer.from(await rewriteCssUrls(source, file)),
     cssModules: { pattern: "[hash]_[local]" },
     minify: true,
   });
@@ -120,7 +166,7 @@ export async function compileCssModule(file: string, source: string): Promise<st
 export async function compileGlobalCss(file: string, source: string): Promise<string> {
   const { code } = transform({
     filename: file,
-    code: Buffer.from(await inlineCssUrls(source, file)),
+    code: Buffer.from(await rewriteCssUrls(source, file)),
     minify: true,
   });
   return compileStyleModule({ file, css: code.toString(), name: PLUGIN_STYLE_NAME });
@@ -187,7 +233,7 @@ export function cssInlinePlugins(options: { name: string; assets?: CssAssetPolic
         const { code, exports } = transform({
           filename: file,
           code: Buffer.from(
-            await inlineCssUrls(await readFile(file, "utf8"), file, options.assets, emitAsset),
+            await rewriteCssUrls(await readFile(file, "utf8"), file, options.assets, emitAsset),
           ),
           cssModules: { pattern: "[hash]_[local]" },
           minify: true,
@@ -216,7 +262,7 @@ export function cssInlinePlugins(options: { name: string; assets?: CssAssetPolic
         const { code } = transform({
           filename: file,
           code: Buffer.from(
-            await inlineCssUrls(await readFile(file, "utf8"), file, options.assets, emitAsset),
+            await rewriteCssUrls(await readFile(file, "utf8"), file, options.assets, emitAsset),
           ),
           minify: true,
         });
@@ -241,7 +287,7 @@ export function cssInlinePlugins(options: { name: string; assets?: CssAssetPolic
         const { code } = transform({
           filename: file,
           code: Buffer.from(
-            await inlineCssUrls(await readFile(file, "utf8"), file, options.assets, emitAsset),
+            await rewriteCssUrls(await readFile(file, "utf8"), file, options.assets, emitAsset),
           ),
           minify: true,
         });
