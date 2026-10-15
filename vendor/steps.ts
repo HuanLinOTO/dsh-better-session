@@ -1,9 +1,9 @@
 // 上游同步的步骤清单：`patch` 改上游工作树，`prebuild` 生成源码面消费的产物、编译 native addon。
 // 用 TS 写就是为了每个阶段、每条步骤旁边写得下「为什么」。
 //
-// 执行器与步骤类型见 `.agents/skills/dsh-plugin-upstream-sync/scripts/steps.ts`；两阶段的语义与
-// 各步骤类型的判据在 `dsh-plugin-upstream-sync` 技能里。
-import type { Step } from "../.agents/skills/dsh-plugin-upstream-sync/scripts/steps.ts";
+// 执行器与步骤类型见 `scripts/upstream-sync/src/steps.ts`；两阶段的语义与各步骤类型的判据在
+// `dsh-plugin-upstream-sync` 技能里。
+import type { Step } from "../scripts/upstream-sync/src/steps.ts";
 
 // 从 sync 的干净基线跑一次（不是每条步骤都幂等）。
 export const patch: Step[] = [
@@ -23,6 +23,24 @@ export const patch: Step[] = [
   { type: "git", patch: "decorator-dual-protocol.patch" },
   // subprocess runner 的转译器改由 `DSH_SOURCE_LOADER` 注入（上游默认的 `tsx/esm` 本仓库里没有）。
   { type: "git", patch: "source-loader.patch" },
+  // 认证移除：页面与资源都由自研 web 层（vite dev server）提供，这层 cookie 校验只剩阻碍——摘掉它
+  // 之后所有 `/api/*` 一律 401（见 `remove-browser-auth.patch` 的说明）。
+  { type: "git", patch: "remove-browser-auth.patch" },
+  // 渲染期写入：`ui-model-selection` 的目录由 inject 工厂构造，而 renderer 会在**渲染期间**跑那个工厂；
+  // 构造里那次 `syncInputs()` 写 store 会触发 React 的
+  // "Cannot update a component while rendering a different component"（`DocumentTitle` 订阅了 store）。
+  // 把首次同步推到微任务。
+  { type: "git", patch: "model-selection-deferred-sync.patch" },
+  // 渲染窗口内的 store 写入：`publishRetention` 会在渲染期被调到（`ui-model-selection` 的 inject 工厂在
+  // 渲染期 materialize 会话 scope → retain），同步写 sessions store 会让 React 的 `useSyncExternalStore`
+  // 在渲染期间发现快照变化并报「Cannot update a component while rendering a different component」。
+  // 写入批处理到微任务（结构性更新走微任务本来就是这一层的纪律）。
+  { type: "git", patch: "session-retention-batched.patch" },
+  // `connection/src/client/rpc.ts` 按值用到 `RpcId`，而 `client/api.ts` / `client/index.ts` 又把它**从这里**
+  // 再导出（类型面）。类型被当值处理时（我们这边 `verbatimModuleSyntax: false`）这条链断在 `client/rpc.ts`：
+  // `api/remotes` 的 client 面 `export type { …, RpcId, … } from '@deepseek-ai/dsh-client-connection/client'`
+  // 会求值成运行导入，浏览器报 `does not provide an export named 'RpcId'`。补一行再导出，两侧同形。
+  { type: "git", patch: "connection-client-rpc-reexport.patch" },
   {
     type: "exports",
     // 生成物出口：目标是 `prebuild` 阶段写出的 `.ts`（不是 `lib/*.js`），所以按出口名显式改指。
@@ -35,9 +53,12 @@ export const patch: Step[] = [
     // 要求每个 export 解析到**存在的**源文件，未映射的出口会让生成失败。
     explicit: {
       "@deepseek-ai/dsh-app-boot": {
-        "./worker/profile-resolution-bootstrap": "./src/profile-resolution/worker-bootstrap.ts",
+        "./worker/profile-resolution-bootstrap":
+          "./src/profile-resolution/worker-bootstrap.ts",
       },
-      "@deepseek-ai/dsh-client-ui-theme": { "./brand-font.css": "./src/styles/brand-font.css" },
+      "@deepseek-ai/dsh-client-ui-theme": {
+        "./brand-font.css": "./src/styles/brand-font.css",
+      },
       "@deepseek-ai/dsh-host-directory-picker-native": {
         "./worker": "./src/win32-dialog-worker.ts",
       },
