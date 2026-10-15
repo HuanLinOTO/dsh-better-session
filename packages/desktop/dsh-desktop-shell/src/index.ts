@@ -309,9 +309,6 @@ async function shellLog(text: string): Promise<void> {
 
 async function main(): Promise<void> {
   const development = developmentLayout();
-  await shellLog(
-    `启动：形态=${development === undefined ? "bundle" : "dev"} root=${globalThis.__DSH_SHELL_ROOT__ ?? "(未知)"}`,
-  );
   const resources = runtimeResources();
   const hostInspectPort = developmentHostInspectPort(development !== undefined);
   const profileDir =
@@ -319,6 +316,21 @@ async function main(): Promise<void> {
 
   const runtimeDir = development?.runtimeDir ?? resources.runtime;
   const dataDir = resolveDshHome(appConfig);
+  // bundles 的真值在 profile 的清单里（`dsh.profile.bundles`）——壳不持有这份列表，读一次只为日志。
+  const bundleCount = await readFile(join(profileDir, "package.json"), "utf8")
+    .then(
+      (text) =>
+        (JSON.parse(text) as { dsh?: { profile?: { bundles?: unknown[] } } }).dsh?.profile?.bundles
+          ?.length,
+    )
+    .catch(() => undefined);
+  // **一行说清启动面**：形态 / 根 / profileDir / 数据面 / bundles 数。打包形态出问题（profile 路径、
+  // bundle 配置没生效、少服务）时，这一行就是第一现场——以前只有"形态 + 根"，路径对不对全靠猜。
+  await shellLog(
+    `启动：形态=${development === undefined ? "bundle" : "dev"} root=${globalThis.__DSH_SHELL_ROOT__ ?? "(未知)"} ` +
+      `profileDir=${profileDir} dataDir=${dataDir ?? "(未解析)"} dataDirSpec=${appConfig.dataDir} ` +
+      `bundles=${String(bundleCount)}`,
+  );
 
   if (development === undefined) {
     if (dataDir === undefined)

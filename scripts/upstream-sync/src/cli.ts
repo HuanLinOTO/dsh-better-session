@@ -10,11 +10,11 @@
 //   pnpm dlx @oxc-node/cli scripts/upstream-sync/src/cli.ts sync      # 1. 对齐到目标提交
 //   pnpm dlx @oxc-node/cli scripts/upstream-sync/src/cli.ts patch     # 2. steps.ts 的 patch 阶段
 //   pnpm dlx @oxc-node/cli scripts/upstream-sync/src/cli.ts prebuild  # 3. steps.ts 的 prebuild 阶段
-import { runPatch } from "./patch.js";
-import { runPrebuild } from "./prebuild.js";
-import { runSync } from "./sync.js";
-import { vendoredDrift, syncVendoredFiles } from "./vendored.js";
-import { upstreamPaths } from "./common.js";
+import { runPatch } from "./patch.ts";
+import { runPrebuild } from "./prebuild.ts";
+import { runSync } from "./sync.ts";
+import { vendoredDrift, syncVendoredFiles } from "./vendored.ts";
+import { upstreamPaths } from "./common.ts";
 
 const COMMANDS: Record<string, () => Promise<void>> = {
   sync: runSync,
