@@ -11,8 +11,10 @@
   "type": "module",
   "devDependencies": {
     "@local/devkit": "workspace:*",
+    "@local/dshdev": "workspace:*",
+    "@local/dts-prepare": "workspace:*",
+    "@local/tsdown-plugin-cordis": "workspace:*",
     "@local/typert-generator": "workspace:*",
-    "@morlay/dsh-desktopify": "workspace:*",
     "@oxc-node/core": "^0.1.6",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
@@ -34,5 +36,5 @@
     "vitest": "5.x",
     "zx": "^8.8.5"
   },
-  "packageManager": "pnpm@12.10.1"
+  "packageManager": "pnpm@12.11.2"
 }
