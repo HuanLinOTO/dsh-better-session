@@ -22,17 +22,19 @@ import type { RunProfileOptions } from "@deepseek-ai/dsh/profile-boot";
 /** One booted app profile: the settled root context and its shutdown controller. */
 export type AppProfileBoot = Awaited<ReturnType<typeof runProfile>>;
 
-// 安装根的解析锚点：`<runtimeDir>/node_modules/@deepseek-ai/dsh/package.json`。官方 bundles 与 dsh
-// 都从这个安装解析（profile 自己那份 node_modules 只解析 app 的 bundle）；宿主入口用同一形状。
-function installAnchorOf(runtimeDir: string): string {
-  return join(runtimeDir, "node_modules", "@deepseek-ai", "dsh", "package.json");
+// **解析锚点 = profile 自己的 `node_modules`**：官方 bundles 与 `dsh` 都由它解析。
+//
+// 以前指 `<runtimeDir>/node_modules/@deepseek-ai/dsh/package.json`——那是 runtime 还带着一份完整闭包的年代。
+// runtime 现在只放工具链（`node` / `pnpm` / loader），依赖面由随包 tar 解压进 profile，锚点跟着那份走。
+function installAnchorOf(profileDir: string): string {
+  return join(profileDir, "node_modules", "@deepseek-ai", "dsh", "package.json");
 }
 
 /** Inputs for one app profile boot. */
 export interface AppProfileOptions {
   /** profile root：app 目录本身，或它的部署副本。 */
   readonly profileDir: string;
-  /** 安装根；锚点见 {@link installAnchorOf}。 */
+  /** 工具链根（`node` / `pnpm` / loader）：**不是**依赖面，锚点见 {@link installAnchorOf}。 */
   readonly runtimeDir: string;
   /** 形态名（`desktop` / `web`）：给 `profileContext.name` 与按 profile 名门控的行。 */
   readonly profile: string;
@@ -53,7 +55,7 @@ export interface AppProfileOptions {
  * @throws 清单、bundle 自身的 patch、或 overlay 读不出来时（跳过的 bundle 只上报，不抛）。
  */
 export async function bootAppProfile(options: AppProfileOptions): Promise<AppProfileBoot> {
-  const installAnchor = installAnchorOf(options.runtimeDir);
+  const installAnchor = installAnchorOf(options.profileDir);
   const profile = loadProfileDirectory("dsh", options.profileDir, installAnchor);
   // 加载跳过原因由启动方上报（与上游 desktop-host 同一口径）。
   reportSkippedBundles("dsh", profile);
