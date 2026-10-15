@@ -57,7 +57,7 @@
   `locale/zh.json`，内容形如 `{ "meta": { "title": …, "description": … } }`；`files` 里要带上，出口由上面
   的生成器按 `locale/en.json` 是否存在补。上游 `app-boot` 的 `readPluginMeta` 按包名 + 该出口读插件
   清单页的标题与描述，缺了它就退化成 package.json 的英文 name/description。跨包守卫见
-  `devpackages/devkit/src/__tests__/plugin-locale.spec.ts`（直接用上游读取器实测每个发布包）。
+  `dshdev check-locale`（直接用上游读取器实测每个 `dsh.bundle` 的包）。
 - **插件清单的图标走 manifest 顶层的 `icon`**：相对包根的一个文件（如 `./icon.svg`），`files` 里要带上——
   漏了它装出来的包没图标，而本仓库开发态看不出来。上游 `app-boot` 的 `readPluginMeta` 把它读成 `data:` URI
   （绝对路径 / URL / `data:` 一律拒绝），清单页的卡片与行按它渲染，读不到就静默退回默认 artwork。

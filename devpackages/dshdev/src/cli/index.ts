@@ -111,4 +111,38 @@ program
     if (missing.length > 0) process.exitCode = 1;
   });
 
+program
+  .command("check-locale")
+  .description("check the faces only `dsh.bundle` packages need: locale exports, published files, en/zh titles")
+  .argument("[root]", "repository root (default: current directory)")
+  .action(async (root: string | undefined) => {
+    const { reportLocaleFaces } = await import("./check-locale.ts");
+    const problems = await reportLocaleFaces(root);
+    for (const problem of problems) process.stderr.write(`[check-locale] ${problem}\n`);
+    if (problems.length > 0) process.exitCode = 1;
+  });
+
+program
+  .command("publish")
+  .description("publish the package in the current directory if its version is new (CI step; don't run locally)")
+  .option("--registry <url>", "registry to publish to (default: GitHub Packages)")
+  .option("--branch <name>", "branch recorded in the published manifest")
+  .action(async (options: { registry?: string; branch?: string }) => {
+    const { runPublish } = await import("./publish.ts");
+    const status = await runPublish({
+      ...(options.registry === undefined ? {} : { registry: options.registry }),
+      ...(options.branch === undefined ? {} : { branch: options.branch }),
+    });
+    if (status !== 0) process.exitCode = status;
+  });
+
+program
+  .command("login")
+  .description("write the publish token into ~/.npmrc (CI step; don't run locally)")
+  .action(async () => {
+    const { runLogin } = await import("./login.ts");
+    const status = await runLogin();
+    if (status !== 0) process.exitCode = status;
+  });
+
 await program.parseAsync(process.argv);
