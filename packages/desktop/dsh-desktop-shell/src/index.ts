@@ -362,9 +362,10 @@ async function main(): Promise<void> {
       // 宿主入口一律按 node 的解析取**源码**（`@morlay/dsh-desktop-host` 的 exports 指 `src/index.ts`，
       // 由上面的 loader 转译）：两种形态同一条路，部署里不必再落一份 dist 载荷。
       //
-      // 解析基准是**运行时根**（dev 是仓库的 pnpm store，bundle 是 `Resources/runtime`）：那个目录的
-      // `node_modules` 里装着宿主包。
-      entry: createRequire(join(runtimeDir, "index.js")).resolve(DESKTOP_HOST_PACKAGE),
+      // 解析基准是**壳自己**：`@morlay/dsh-desktop-host` 是壳的依赖（打包后落在 `Resources/app/node_modules`
+      // 里）。以前这里以**运行时根**为基准（`Resources/runtime/index.js`），能解析只是因为 runtime 里还留着一份
+      // 重复的闭包——runtime 现在只放工具链（node / pnpm / loader），依赖面在壳与 profile 各自那一份里。
+      entry: createRequire(import.meta.url).resolve(DESKTOP_HOST_PACKAGE),
 
       extraEnv: {
         ...(dataDir === undefined ? {} : { DSH_HOME: dataDir }),
