@@ -21,6 +21,13 @@
   settings namespace）。本地 patch 是例外，流程见 `dsh-plugin-upstream-sync` 技能。
 - **工具链在根**：各包 `package.json` 只声明自身依赖；上游包以 `workspace:*` 声明在 `peerDependencies`
   （插件契约面）或 `devDependencies`（测试用）。
+- **运行期用到什么就声明在运行期面**：源码里 `import` 的包（含 client 半用到的 `react` 这类）要写在
+  `dependencies` 或 `peerDependencies`——前端链的外置判据只认本包声明的运行期依赖，躺在 `devDependencies`
+  里会被**内联**进产物（同一个库两份实例）。测试与构建用的（`vitest`、`@testing-library/*`、`@types/*`、
+  构建插件）留在 `devDependencies`。
+- **例外：`electron` 只能写在 `devDependencies`**（`packages/desktop/dsh-desktop-shell`）。electron-builder
+  有硬规矩——它由打包器自己提供；而且壳的 app 目录是 `pnpm deploy --prod` 的产物，放运行期面就会被实体化进
+  那份清单的 `dependencies`，打包直接报 `Package "electron" is only allowed in "devDependencies"`。
 
 ## 包出口
 
