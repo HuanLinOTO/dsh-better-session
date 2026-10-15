@@ -91,12 +91,26 @@ describe("ts 2 schema", () => {
   it("递归类型走 z.lazy 自引用", async () => {
     const index = await indexOf("export interface Node { next: Node | null; value: string }");
     expect(zod("Node", index)).toBe(
-      "z.object({\n  'next': z.union([z.literal(null), z.lazy(() => Node$schema())]),\n  'value': z.string(),\n})",
+      "z.object({\n  'next': z.union([z.literal(null), z.lazy(() => NodeRemoteCodec$schema())]),\n  'value': z.string(),\n})",
     );
   });
 
-  it("未解析的类型名留标记而不是静默变成 unknown", async () => {
-    expect(zod("Missing")).toBe("z.unknown() /* 未解析 Missing */");
+  it("brand 标记折叠、嵌套 union 展平、类型操作符忽略", () => {
+    expect(zod("string & { readonly BRAND: unique symbol }")).toBe(
+      "z.intersection(z.string(), z.unknown())",
+    );
+    expect(zod('("a" | "b") | ("c" | "d")')).toBe(
+      'z.union([z.literal("a"), z.literal("b"), z.literal("c"), z.literal("d")])',
+    );
+    expect(zod("readonly string[]")).toBe("z.array(z.string())");
+  });
+
+  it("AsyncIterable 解包（stream 方法的 wire 类型）", () => {
+    expect(zod("AsyncIterable<boolean>")).toBe("z.boolean()");
+  });
+
+  it("解析不了就报错（与上游同规则：不静默降级成 unknown）", async () => {
+    expect(() => zod("Missing")).toThrow(/引用解析失败：Missing/);
     expect(await indexOf("")).toEqual(emptyIndex());
   });
 });

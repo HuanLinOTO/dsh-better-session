@@ -1,0 +1,86 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`上游 fixtures > type-model：逐类型生成 zod 的形状（快照） 1`] = `
+{
+  "AbstractEntity": "z.object({
+
+})",
+  "Added": "z.unknown() /* TODO TSTypeAliasDeclaration */",
+  "Agent": "z.object({
+
+})",
+  "AgentPhase": "z.union([z.literal("Unknown"), z.literal("idle"), z.literal("running")])",
+  "AliasedService": "z.object({
+
+})",
+  "Box": "<抛错>",
+  "Callable": "z.record(z.string(), z.unknown())",
+  "ClientAgent": "z.object({
+
+})",
+  "ClientBridge": "z.object({
+
+})",
+  "ClientView": "z.object({
+  'agent': z.object({
+
+}).readonly(),
+  'inherited': z.object({
+
+}).readonly(),
+  'importedAgent': z.unknown() /* TODO TSImportType */.readonly(),
+  'importedAgentWithNamedArgument': z.unknown() /* TODO TSImportType */.readonly(),
+  'namespaceAgent': z.object({
+
+}).readonly(),
+  'defaultService': z.object({
+
+}).readonly(),
+  'payload': z.object({
+  'name': z.string(),
+  'count': z.number().optional(),
+}).readonly(),
+  'phase': z.union([z.literal("Unknown"), z.literal("idle"), z.literal("running")]).readonly(),
+})",
+  "DefaultOnlyService": "z.object({
+
+})",
+  "DemoService": "z.object({
+
+})",
+  "Entity": "z.object({
+  'id': z.string().readonly(),
+})",
+  "Flags": "z.unknown() /* TODO TSTypeAliasDeclaration */",
+  "Guards": "z.object({
+
+})",
+  "Payload": "z.object({
+  'name': z.string(),
+  'count': z.number().optional(),
+})",
+  "PlainMap": "z.unknown() /* TODO TSTypeAliasDeclaration */",
+  "Present": "z.unknown() /* TODO TSTypeAliasDeclaration */",
+  "Recursive": "z.object({
+  'next': z.object({
+  'next': z.lazy(() => RecursiveRemoteCodec$schema()).readonly().optional(),
+}).readonly().optional(),
+})",
+  "Remapped": "z.unknown() /* TODO TSTypeAliasDeclaration */",
+  "Result": "z.unknown() /* TODO TSTypeAliasDeclaration */",
+  "Route": "z.unknown() /* TODO TSTypeAliasDeclaration */",
+  "StringResult": "z.unknown() /* TODO TSTypeAliasDeclaration */",
+  "SyntaxZoo": "<抛错>",
+  "TagOnly": "z.object({
+  'value': z.string().readonly(),
+})",
+  "Topic": "z.unknown() /* TODO TSTypeAliasDeclaration */",
+  "Unpunctuated": "z.object({
+  'value': z.string().readonly(),
+})",
+  "Variance": "<抛错>",
+  "WritableService": "z.object({
+
+})",
+}
+`;
