@@ -17,6 +17,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
+    "@deepseek-ai/dsh-app-boot": "workspace:*",
     "@morlay/dsh-desktop-host": "workspace:*",
     "@morlay/dsh-desktop-shell": "workspace:*",
     "@morlay/web-custom-profile": "workspace:*",
@@ -30,7 +31,6 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh-agent": "workspace:*",
-    "@deepseek-ai/dsh-app-boot": "workspace:*",
     "@deepseek-ai/dsh-client-connection": "workspace:*",
     "@deepseek-ai/dsh-tools": "workspace:*",
     "@local/devkit": "workspace:*",

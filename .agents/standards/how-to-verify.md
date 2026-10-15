@@ -34,7 +34,7 @@
 
 - **发布走 CI**：`.github/workflows/release.yml`（`main` 与 `next` 分支：`prepare`（sync → patch → dep → prebuild）→
   `build` → `lint` → `test`（注入外部服务门控所需的环境变量）→ `build` → GitHub Packages publish）。
-- **dist-tag 随版本号走**（[`scripts/publish-if-need.mts`](../../scripts/publish-if-need.mts)）：稳定版 →
+- **dist-tag 随版本号走**（[`dshdev publish`](../../devpackages/dshdev/src/cli/publish.ts)）：稳定版 →
   `latest`；`-alpha.*` → `alpha`；其余预发布（rc / beta / …）→ `next`。预发布绝不落在 `latest`。
 - **本地私有包统一 `@local/*` 前缀，既不发布、也不进发布清单**：构建时一律内联进产物
   （规则 [`isLocalPackage`](../../devpackages/tsdown-plugin-cordis/src/cordis-host.ts)，devkit 预设与

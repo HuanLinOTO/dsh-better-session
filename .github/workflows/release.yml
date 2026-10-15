@@ -48,7 +48,7 @@ jobs:
       - run: just prepare
 
       - name: Login to GitHub Packages
-        run: pnpm dlx @oxc-node/cli scripts/login.mts
+        run: pnpm exec dshdev login
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

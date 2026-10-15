@@ -40,11 +40,14 @@ clean-dist:
 fmt:
     pnpm exec oxfmt .
 
+# 我们自己的规矩的检查工具（不是测试）：包面（`dsh.bundle` 的包才有 locale 那套）与运行期依赖声明。
 lint:
     pnpm exec oxlint .
+    pnpm exec dshdev check-locale
 
+# 发布一律走 CI；这一条是 CI 的发布步骤（逐包唤起，只发 `@morlay/*` 里版本是新的那些）。
 publish:
-    pnpm -r --filter './packages/*/*' --workspace-concurrency=1 exec node {{ justfile_directory() }}/scripts/publish-if-need.mts
+    pnpm -r --filter './packages/*/*' --workspace-concurrency=1 exec dshdev publish
 
 # 全仓声明（一步、两个 face）：生成到 target/dts，各包构建只按路径取自己的那份来合并。
 # 插件包构建：`@deepseek-ai/*` 经 exports 指到 src 后，tsdown 加载 config（→ @local/devkit → 上游源码）
