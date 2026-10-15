@@ -1,6 +1,5 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
 import { once } from "node:events";
-import { join } from "node:path";
 import { Readable, Writable } from "node:stream";
 import {
   DESKTOP_HOST_PROTOCOL_VERSION,
@@ -17,7 +16,6 @@ import {
   type DesktopHostEvent,
   type DesktopHostResponseFrame,
 } from "@morlay/dsh-desktop-host/wire";
-import { DESKTOP_HOST_PACKAGE } from "./official.ts";
 
 const MAX_HOST_DIAGNOSTIC_CHARS = 64 * 1024;
 
@@ -52,6 +50,8 @@ async function exitsWithin(exit: Promise<void>, milliseconds: number): Promise<b
 
 export interface DesktopHostReady {
   readonly protocolVersion: number;
+  /** 宿主进程内回环的 ws 端口（页面把 `ws://app/…` 重写到这里，见 `@morlay/dsh-desktop-host/ws-bridge`）。 */
+  readonly wsPort: number;
 }
 
 // 后端调试端点的状态：`url` 为空表示没开（被关掉或开不起来，原因在 `message`）。
@@ -64,6 +64,12 @@ export type DesktopHostSpawn = (
 ) => ChildProcess;
 
 export interface DesktopHostOptions {
+  /**
+   * 宿主入口（绝对路径）：由壳按 node 的解析给出（`@morlay/dsh-desktop-host` 的 exports 指到
+   * `src/index.ts`）。宿主由壳用 `--import` 挂着 TS loader 起，**两种形态都直接跑源码**——部署里不必再落
+   * 一份 dist 载荷。
+   */
+  readonly entry: string;
   readonly nodeArgs?: readonly string[];
 
   readonly extraEnv?: Readonly<Record<string, string>>;
@@ -105,21 +111,14 @@ export class DesktopHostProcess {
     private readonly node: string,
     private readonly runtimeDir: string,
     private readonly profileDir: string,
-    private readonly inspectPort?: number,
-    private readonly options: DesktopHostOptions = {},
+    private readonly inspectPort: number | undefined,
+    private readonly options: DesktopHostOptions,
   ) {}
 
   // 启动子进程一次；`ready` 之后才解析。
   async start(): Promise<DesktopHostReady> {
     if (this.child !== undefined) return this.readyPromise;
-    // 部署里的 host 是工具自己的变体包（@morlay/dsh-desktop-host），落位名字与入口路径都要对上。
-    const entry = join(
-      this.runtimeDir,
-      "node_modules",
-      ...DESKTOP_HOST_PACKAGE.split("/"),
-      "lib",
-      "index.js",
-    );
+    const entry = this.options.entry;
     const packageManager = this.options.packageManager;
     const args = [
       "--expose-internals",
@@ -202,7 +201,7 @@ export class DesktopHostProcess {
         for (const listener of this.inspectedListeners) listener(message);
         return;
       }
-      this.readyResolve({ protocolVersion: message.protocolVersion });
+      this.readyResolve({ protocolVersion: message.protocolVersion, wsPort: message.wsPort });
     });
     child.once("error", (error) => {
       this.fail(error);

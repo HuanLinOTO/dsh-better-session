@@ -1,7 +1,7 @@
 {
   "name": "@morlay/dsh-desktop-shell",
   "version": "0.2.6-alpha.0",
-  "description": "Electron shell for dsh desktop apps: serves the app's own <name>:// scheme, boots the desktop profile through the @morlay/dsh-desktop-host child over byte pipes, and installs the profile seed on first launch. The CLI that packages a workspace around it is @morlay/dsh-desktopify.",
+  "description": "Electron shell for dsh desktop apps: serves the app's own <name>:// scheme, boots the desktop profile through the @morlay/dsh-desktop-host child over byte pipes, and installs the profile seed on first launch. The CLI that packages a workspace around it is @local/dshdev.",
   "keywords": [
     "desktop",
     "dsh",
@@ -15,12 +15,11 @@
     "url": "https://github.com/morlay/dsh-plugin.git"
   },
   "files": [
+    "src",
     "locale/*.json",
     "dist"
   ],
   "type": "module",
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
   "exports": {
     ".": "./src/index.ts",
     "./appconfig": "./src/appconfig.ts",
@@ -28,17 +27,40 @@
     "./official": "./src/official.ts",
     "./profile-project": "./src/profile-project.ts",
     "./seed": "./src/seed.ts",
+    "./inline-packages": "./src/inline-packages.ts",
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json"
   },
   "publishConfig": {
     "exports": {
-      ".": "./dist/index.mjs",
-      "./appconfig": "./dist/appconfig.mjs",
-      "./dshhome": "./dist/dshhome.mjs",
-      "./official": "./dist/official.mjs",
-      "./profile-project": "./dist/profile-project.mjs",
-      "./seed": "./dist/seed.mjs",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "./appconfig": {
+        "types": "./dist/appconfig.d.mts",
+        "default": "./dist/appconfig.mjs"
+      },
+      "./dshhome": {
+        "types": "./dist/dshhome.d.mts",
+        "default": "./dist/dshhome.mjs"
+      },
+      "./official": {
+        "types": "./dist/official.d.mts",
+        "default": "./dist/official.mjs"
+      },
+      "./profile-project": {
+        "types": "./dist/profile-project.d.mts",
+        "default": "./dist/profile-project.mjs"
+      },
+      "./seed": {
+        "types": "./dist/seed.d.mts",
+        "default": "./dist/seed.mjs"
+      },
+      "./inline-packages": {
+        "types": "./dist/inline-packages.d.mts",
+        "default": "./dist/inline-packages.mjs"
+      },
       "./package.json": "./package.json",
       "./locale/*.json": "./locale/*.json"
     }
@@ -48,17 +70,13 @@
     "gen:official-packages": "node --import @oxc-node/core/register scripts/gen-official-packages.ts",
     "prepublishOnly": "pnpm run build"
   },
-  "dependencies": {
-    "electron": "^44.3.0"
-  },
   "devDependencies": {
     "@deepseek-ai/dsh": "workspace:*",
     "@deepseek-ai/dsh-app-boot": "workspace:*",
-    "@deepseek-ai/dsh-atomic-write": "workspace:*",
-    "@deepseek-ai/dsh-client-shortcuts": "workspace:*",
     "@local/devkit": "workspace:*",
-    "@morlay/dsh-desktop-host": "workspace:*",
-    "@types/node": "^26.5.0"
+    "@types/node": "^26.5.0",
+    "electron": "^44.3.0",
+    "@oxc-node/core": "^0.1.6"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-atomic-write": "workspace:^",
@@ -66,5 +84,14 @@
   },
   "engines": {
     "node": ">=24.11.0"
+  },
+  "main": "./main.mjs",
+  "dependencies": {
+    "@deepseek-ai/dsh-atomic-write": "workspace:*",
+    "@deepseek-ai/dsh-client-shortcuts": "workspace:*",
+    "@deepseek-ai/dsh-util-crypto": "workspace:*",
+    "@deepseek-ai/dsh-util-values": "workspace:*",
+    "@local/oxc-node": "workspace:*",
+    "@morlay/dsh-desktop-host": "workspace:*"
   }
 }

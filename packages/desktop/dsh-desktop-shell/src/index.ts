@@ -1,14 +1,30 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol } from "electron";
-import type { BrowserWindowConstructorOptions } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol } from "./electron.ts";
+
+declare global {
+  /** 壳的包根：由引导（`bootstrap.mjs`，它就在包根）写入；发布包里没有引导时为 undefined。 */
+  // eslint-disable-next-line no-var -- 引导与业务代码之间的约定。
+  var __DSH_SHELL_ROOT__: string | undefined;
+}
+
+import type { BrowserWindow as BrowserWindowType, BrowserWindowConstructorOptions } from "electron";
+import { DESKTOP_HOST_PACKAGE } from "./official.ts";
+import { PRELOAD_SOURCE_PATH } from "@morlay/dsh-desktop-host/preload-source";
 import { loadAppConfig, PROFILE_NAME, type AppConfig } from "./appconfig.ts";
 import { installDesktopDirectoryPicker } from "./directory-picker.ts";
 import { installDeveloperMenu } from "./developer-menu.ts";
 import { resolveDshHome } from "./dshhome.ts";
-import { DesktopHostProcess } from "./host-process.ts";
-import { DESKTOP_IPC, DESKTOP_SCHEME_ARGUMENT, assertDesktopSender, desktopScheme } from "./ipc.ts";
+import { DesktopHostProcess, type DesktopHostReady } from "./host-process.ts";
+import {
+  DESKTOP_IPC,
+  DESKTOP_SCHEME_ARGUMENT,
+  DESKTOP_WS_PORT_ARGUMENT,
+  assertDesktopSender,
+  desktopScheme,
+} from "./ipc.ts";
 import {
   PROFILE_WORKSPACE_NAME,
   installProfile,
@@ -27,8 +43,17 @@ import { shellWrappedSpawn } from "./shell-env.ts";
 let focusPrimaryWindow = (): void => {};
 
 // appconfig.json 的位置：打包形态只看 resources，dev 形态由 CLI 指到构建目录。
+/** app 目录（dev 是装配目录、打包是 `Resources/app`）：由引导写进全局。 */
+function shellRoot(): string {
+  const root = globalThis.__DSH_SHELL_ROOT__;
+  if (root === undefined || root === "") {
+    throw new Error("dsh desktop: the shell root is missing (bootstrap did not report it)");
+  }
+  return root;
+}
+
 function appConfigDir(): string {
-  const configured = process.env.DSH_DESKTOP_APPCONFIG_DIR;
+  const configured = developmentLayout() === undefined ? undefined : join(shellRoot(), "..", "runtime");
   return app.isPackaged || configured === undefined || configured === ""
     ? process.resourcesPath
     : configured;
@@ -37,6 +62,7 @@ function appConfigDir(): string {
 function startupFailure(error: unknown): never {
   const message = error instanceof Error ? error.message : String(error);
   console.error(error);
+  void shellLog(`启动失败：${message}`);
   dialog.showErrorBox("dsh desktop startup failed", message);
   app.exit(1);
   throw error instanceof Error ? error : new Error(message);
@@ -71,21 +97,11 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-const WEB_FRONTEND_PACKAGE = "@deepseek-ai/dsh-web-frontend";
 
 const APPLICATION_URL = `${SCHEME}://app/`;
 
 // Windows 自绘标题栏高度（DIP），与 preload 写入的 CSS 变量一致。
 const WINDOWS_TITLEBAR_HEIGHT = 40;
-
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 interface RuntimeResources {
   readonly node: string;
@@ -98,39 +114,58 @@ interface RuntimeResources {
 }
 
 function runtimeResources(): RuntimeResources {
-  const development = !app.isPackaged;
+  // 两种形态的"随包载荷"位置都能自己推出来：
+  // - 打包：`Resources/{runtime,seed}`；
+  // - dev：壳跑在装配目录 `<buildCache>/shell`，于是同级的 `../{runtime,seed}`——工具因此**不需要**把这些
+  //   路径注入进来（dev 的宿主用系统 node，PATH 上就有）。
+  const resourcesDir =
+    developmentLayout() === undefined ? process.resourcesPath : join(shellRoot(), "..");
   const node =
-    (development ? process.env.DSH_DESKTOP_NODE_BINARY : undefined) ??
-    join(
-      process.resourcesPath,
-      "runtime",
-      "node",
-      process.platform === "win32" ? "node.exe" : "node",
-    );
-  const seed =
-    (development ? process.env.DSH_DESKTOP_SEED_DIR : undefined) ??
-    join(process.resourcesPath, "seed");
+    developmentLayout() === undefined
+      ? join(resourcesDir, "runtime", "node", process.platform === "win32" ? "node.exe" : "node")
+      : "node";
+  const seed = join(resourcesDir, "seed");
   return {
     node,
     seed,
     // 随包运行时与 pnpm 只在打包产物里存在；dev 形态从工作区解析依赖。
     runtime: join(seed, SEED_RUNTIME_DIR_NAME),
-    pnpm: join(process.resourcesPath, "runtime", "pnpm", "bin", "pnpm.mjs"),
-    nodeBin: join(process.resourcesPath, "runtime", "bin"),
-    loader: join(process.resourcesPath, "runtime", "loader", "ts-loader.mjs"),
+    pnpm: join(resourcesDir, "runtime", "pnpm", "bin", "pnpm.mjs"),
+    nodeBin: join(resourcesDir, "runtime", "bin"),
+    // 随包载荷就是 `@oxc-node/core` 的 register（与工作区那条 `--import` 同一份实现）。
+    // TS 运行时入口：**按包名解析**（`@local/oxc-node` 是壳的依赖，dev 的装配目录与打包的 app 目录里都装了
+    // 它）。不再由工具注入路径，也不依赖"随包 runtime 里那份拷贝"的布局。
+    loader: fileURLToPath(import.meta.resolve("@local/oxc-node")),
   };
 }
 
-async function installPlantedProfile(
+/**
+ * 让 profile 的依赖指向**当前**这份运行时，**每次启动**都做。
+ *
+ * profile 住在 `$DSH_HOME`（用户数据，跨应用路径），而它的依赖经 `overrides` 的 `link:` 指到随包运行时
+ * ——那个位置**只有现在这一刻**才知道（应用可以被挪到别的目录）。所以这份 `link:` 必须动态算，不能靠
+ * "种的那一次"写死：内容没变就什么都不做，变了才重装一次（离线安装，增量的）。
+ */
+async function refreshProfileLinks(
   profileDir: string,
   resources: RuntimeResources,
 ): Promise<void> {
   const settingsPath = join(profileDir, PROFILE_WORKSPACE_NAME);
   const overrides = await runtimeOverrides(profileDir, resources.runtime);
-  await writeFile(
-    settingsPath,
-    workspaceWithOverrides(await readFile(settingsPath, "utf8"), overrides),
+  const current = await readFile(settingsPath, "utf8");
+  const next = workspaceWithOverrides(current, overrides);
+  // profile 的 `dependencies` 也在这里补：清单里只声明了"要哪些装配行"，来源是**当前这份运行时**的
+  // 绝对位置（相对路径在这里没有稳定解），写成 `link:` 就不必去 registry 解析。
+  const manifestPath = join(profileDir, "package.json");
+  const manifestText = await readFile(manifestPath, "utf8");
+  const manifest = JSON.parse(manifestText) as { dependencies?: Record<string, string> };
+  const dependencies = Object.fromEntries(
+    overrides.map((entry) => [entry.name, `link:${entry.target}`]),
   );
+  const dependencyText = `${JSON.stringify({ ...manifest, dependencies }, undefined, 2)}\n`;
+  if (next === current && dependencyText === manifestText) return;
+  if (next !== current) await writeFile(settingsPath, next);
+  await writeFile(manifestPath, dependencyText);
   await installProfile({
     node: resources.node,
     pnpmEntry: resources.pnpm,
@@ -199,7 +234,9 @@ function windowFrame(): Pick<
 function createWindow(
   preload: string,
   config: { width: number; height: number; minWidth: number; minHeight: number },
-): BrowserWindow {
+  /** 宿主回环的 ws 端口（页面把 `ws://app/…` 重写到它，见 preload 的 `__DSH_DESKTOP_WS__`）。 */
+  wsPort: number,
+): BrowserWindowType {
   const window = new BrowserWindow({
     width: config.width,
     height: config.height,
@@ -214,7 +251,11 @@ function createWindow(
       sandbox: true,
       webSecurity: true,
       // preload 是 sandboxed 的（读不到文件），scheme 只能这样递进去。
-      additionalArguments: [`${DESKTOP_SCHEME_ARGUMENT}=${SCHEME}`],
+      additionalArguments: [
+        `${DESKTOP_SCHEME_ARGUMENT}=${SCHEME}`,
+        // 页面把它当作 `ws://app/…` 的落点（见 preload 的 `__DSH_DESKTOP_WS__`）。
+        `${DESKTOP_WS_PORT_ARGUMENT}=${String(wsPort)}`,
+      ],
     },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -237,11 +278,9 @@ function developmentHostInspectPort(enabled: boolean): number | undefined {
   return port;
 }
 
-// host 进程自己那份转译器：dev 形态用工作区里的（改完即生效），打包形态用随包的。
-// 两条都是绝对路径——host 的 cwd 是部署 / profile 目录，裸名在那儿解析不到。
+// host 进程自己那份转译器（绝对路径——host 的 cwd 是部署 / profile 目录，裸名在那儿解析不到）。
 function sourceLoader(resources: RuntimeResources): string {
-  const configured = process.env.DSH_DESKTOP_SOURCE_LOADER;
-  return configured === undefined || configured === "" ? resources.loader : configured;
+  return resources.loader;
 }
 
 // 拉起的子进程（上游 subprocess runner 等）走同一份转译器：它们按源码面加载上游入口，
@@ -250,44 +289,58 @@ function sourceLoaderEnvironment(path: string): Record<string, string> {
   return { DSH_SOURCE_LOADER: path };
 }
 
+/**
+ * 壳的日志。
+ *
+ * 打包形态的 Electron **不把 `console` 写进 stdout**（它进系统日志），出了事只看到"窗口没起来"。
+ * 所以壳自己的关键节点（启动、宿主就绪、fatal）落一份文件日志，与宿主那份（`${DSH_HOME}/logs/dev-host.log`，
+ * 由 `@morlay/dsh-client-modules` 写）同目录，两边对着看就能定位"页面 → 壳 → 宿主"断在哪一段。
+ */
+async function shellLog(text: string): Promise<void> {
+  const home = resolveDshHome(appConfig) ?? join(process.cwd(), ".dsh-store");
+  const file = join(home, "logs", "shell.log");
+  try {
+    await mkdir(dirname(file), { recursive: true });
+    await appendFile(file, `${new Date().toISOString()} ${text}\n`, "utf8");
+  } catch {
+    // 记不下来就算了：这里已在异常路径上，不该再抛。
+  }
+}
+
 async function main(): Promise<void> {
   const development = developmentLayout();
+  await shellLog(
+    `启动：形态=${development === undefined ? "bundle" : "dev"} root=${globalThis.__DSH_SHELL_ROOT__ ?? "(未知)"}`,
+  );
   const resources = runtimeResources();
   const hostInspectPort = developmentHostInspectPort(development !== undefined);
   const profileDir =
     development?.profileDir ?? join(resolveDshHome(appConfig) ?? "", "profiles", PROFILE_NAME);
 
   const runtimeDir = development?.runtimeDir ?? resources.runtime;
-  const webDocumentRoot = join(
-    runtimeDir,
-    "node_modules",
-    ...WEB_FRONTEND_PACKAGE.split("/"),
-    "dist",
-  );
-  const dshHome = resolveDshHome(appConfig);
+  const dataDir = resolveDshHome(appConfig);
 
   if (development === undefined) {
-    if (dshHome === undefined)
-      throw new Error("dsh desktop: packaged applications require a concrete dshHome");
-    if (await ensureSeedProfile(resources.seed, dshHome)) {
-      await installPlantedProfile(profileDir, resources);
-    }
+    if (dataDir === undefined)
+      throw new Error("dsh desktop: packaged applications require a concrete dataDir");
+    // 重种换的是**装配面**；装那一步不在这儿做——紧接着的 `refreshProfileLinks` 会把依赖写上并装一次
+    // （刚重种出来的清单里没有 `dependencies`，它一定认为需要装）。
+    await ensureSeedProfile(resources.seed, dataDir);
+    await refreshProfileLinks(profileDir, resources);
   }
-  if (!(await pathExists(join(webDocumentRoot, "index.html")))) {
-    throw new Error(
-      `dsh desktop: the Web frontend is missing at ${webDocumentRoot}; ` +
-        `the runtime closure must carry ${WEB_FRONTEND_PACKAGE}`,
-    );
-  }
+  // **两种形态都不要求上游的前端静态产物**：页面与资源由这条链（vite + 联邦预编译，见
+  // `@morlay/dsh-client-modules`）在宿主进程里现场提供，壳只是把请求经字节管道交给它。所以这里不再检查
+  // `@deepseek-ai/dsh-web-frontend/dist`——profile 的 `dsh.profile.bundles` 声明了那条链，就不该再要求它。
 
   let host: DesktopHostProcess | undefined;
-  let mainWindow: BrowserWindow | undefined;
+  let mainWindow: BrowserWindowType | undefined;
   let quitConfirmed = false;
   let quitPrompting = false;
-  const appPreload = fileURLToPath(new URL("./preload-app.cjs", import.meta.url));
+  /** preload 落盘的位置：字节由宿主现场打包（sandboxed preload 只能是 CJS），这里只是放它。 */
+  const preloadPathOf = (): string => join(app.getPath("userData"), "preload-app.cjs");
 
   // 只有打包形态拦一次确认（开发形态关窗即退出）。
-  const confirmQuit = async (window?: BrowserWindow): Promise<void> => {
+  const confirmQuit = async (window?: BrowserWindowType): Promise<void> => {
     if (quitPrompting) return;
     quitPrompting = true;
     try {
@@ -319,18 +372,37 @@ async function main(): Promise<void> {
     if (hostFailureHandled) return;
     hostFailureHandled = true;
     console.error(`[dsh-shell] backend stopped: ${error.message}`);
+    void shellLog(`宿主停止：${error.message}`);
     dialog.showErrorBox("dsh desktop backend stopped", error.message);
     quitConfirmed = true;
     app.exit(1);
   };
 
-  const startHost = async (target: string = profileDir): Promise<DesktopHostProcess> => {
+  const startHost = async (
+    target: string = profileDir,
+  ): Promise<{ process: DesktopHostProcess; ready: DesktopHostReady }> => {
     const loader = sourceLoader(resources);
     const next = new DesktopHostProcess(resources.node, runtimeDir, target, hostInspectPort, {
       nodeArgs: [`--import=${loader}`],
+      // 宿主入口一律按 node 的解析取**源码**（`@morlay/dsh-desktop-host` 的 exports 指 `src/index.ts`，
+      // 由上面的 loader 转译）：两种形态同一条路，部署里不必再落一份 dist 载荷。
+      //
+      // 解析基准是**运行时根**（dev 是仓库的 pnpm store，bundle 是 `Resources/runtime`）：那个目录的
+      // `node_modules` 里装着宿主包。
+      entry: createRequire(join(runtimeDir, "index.js")).resolve(DESKTOP_HOST_PACKAGE),
 
       extraEnv: {
-        ...(dshHome === undefined ? {} : { DSH_HOME: dshHome }),
+        ...(dataDir === undefined ? {} : { DSH_HOME: dataDir }),
+        // 宿主按它现场打包 preload（见 `@morlay/dsh-desktop-host/preload-source`）。
+        ...(globalThis.__DSH_SHELL_ROOT__ === undefined
+          ? {}
+          : { DSH_DESKTOP_SHELL_ROOT: globalThis.__DSH_SHELL_ROOT__ }),
+        // 形态标志：壳起宿主时会过滤掉所有 `DSH_DESKTOP_*`（那些是 Electron 侧的元数据），所以这条链要
+        // 判断"跑在桌面形态里"得用别的名字（前端资源的预编译策略据此分流）。
+        DSH_DEV_FORM: "desktop",
+        // 这条链是 fs / 哈希密集的（预编译按包读源码、算指纹、写产物 + vite 的转译），这些全走 libuv 线程池，
+        // 默认只有 4：并发一多请求就排在池子外。bundle 形态不经过 `dshdev`，所以这里也设一份。
+        UV_THREADPOOL_SIZE: process.env["UV_THREADPOOL_SIZE"] ?? "64",
         ...(development === undefined ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
         ...sourceLoaderEnvironment(loader),
       },
@@ -343,8 +415,8 @@ async function main(): Promise<void> {
       spawn: shellWrappedSpawn,
       onFailure: handleHostFailure,
     });
-    await next.start();
-    return next;
+    const ready = await next.start();
+    return { process: next, ready };
   };
 
   // 应用页面的全部请求（文档、资源、插件 bundle、API、流）都经字节管道交给宿主进程内的 webServer。
@@ -354,7 +426,17 @@ async function main(): Promise<void> {
     const active = host;
     if (active === undefined) return new Response("backend unavailable", { status: 503 });
     if (!app.isPackaged) console.error(`[dsh-shell] recv ${request.method} ${url.pathname}`);
-    const response = await active.fetch(request);
+    // **去掉条件请求头**：宿主的响应要包成 Fetch `Response`，而它不接受 304（`Invalid response status
+    // code 304`）——vite 对源码模块正是回 304 的（`/@vite/client`、`/index.ts` 那些），于是每次刷新都在
+    // 这里抛错。不带条件头，服务端就只会回 200（这条链的产物也不大，不值得为 304 冒这个险）。
+    const conditional = new Request(request.url, {
+      method: request.method,
+      headers: [...request.headers].filter(
+        ([name]) => name !== "if-none-match" && name !== "if-modified-since",
+      ),
+      ...(request.body === null ? {} : { body: request.body, duplex: "half" }),
+    });
+    const response = await active.fetch(conditional);
     // dev 形态打印每个应用请求：排查「页面 → 壳 → 宿主」断在哪一段。
     if (!app.isPackaged)
       console.error(`[dsh-shell] ${request.method} ${url.pathname} → ${String(response.status)}`);
@@ -482,8 +564,11 @@ async function main(): Promise<void> {
     shortcuts.dispose();
   });
 
-  const createMainWindow = (): BrowserWindow => {
-    const window = createWindow(appPreload, appConfig.window);
+  /** 宿主回环的 ws 端口：宿主起好之后填入（窗口重建时仍用它）。 */
+  let desktopWsPort = 0;
+  let appPreload = preloadPathOf();
+  const createMainWindow = (): BrowserWindowType => {
+    const window = createWindow(appPreload, appConfig.window, desktopWsPort);
     mainWindow = window;
     shortcuts.attach(window);
     window.once("ready-to-show", () => {
@@ -522,7 +607,23 @@ async function main(): Promise<void> {
     developerMenu.dispose();
   });
 
-  host = await startHost();
+  const started = await startHost();
+  host = started.process;
+  desktopWsPort = started.ready.wsPort;
+  // preload 的字节由宿主机现场打包（sandboxed preload 只能 CJS，也挂不了 hooks）：取回来落到用户数据目录，
+  // 再把路径交给窗口——装配目录里因此没有预产的 `dist/`。
+  appPreload = preloadPathOf();
+  const preload = await started.process.fetch(
+    new Request(`${SCHEME}://app${PRELOAD_SOURCE_PATH}`),
+  );
+  if (!preload.ok) {
+    throw new Error(
+      `dsh desktop: preload bundling failed (${String(preload.status)}): ${await preload.text()}`,
+    );
+  }
+  await writeFile(appPreload, await preload.text(), "utf8");
+  console.log(`[dsh-shell] 宿主就绪：wsPort=${String(desktopWsPort)} protocol=${String(started.ready.protocolVersion)}`);
+  await shellLog(`宿主就绪 wsPort=${String(desktopWsPort)}`);
 
   mainWindow = createMainWindow();
   await mainWindow.loadURL(APPLICATION_URL);

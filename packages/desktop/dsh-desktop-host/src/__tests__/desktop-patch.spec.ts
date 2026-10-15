@@ -8,10 +8,10 @@ const PATCH_PATH = join(
   "packages/desktop/dsh-desktop-host/config/desktop.cordis.patch.yml",
 );
 const BUNDLE_ROOT = join(repoRoot, "vendor/deepseek-harness/packages/bundle");
-// 源码 client 半的现场打包行：单独一层，web 形态也要挂（ 用 `--patch`）。
+// 前端服务（`@morlay/dsh-client-modules`）那一行：单独一层，web 形态也要挂（用 `--patch`）。
 const DEV_CLIENT_PATCH_PATH = join(
   repoRoot,
-  "packages/desktop/dsh-desktop-host/config/dev-client-bundles.cordis.patch.yml",
+  "packages/bundles/web-custom-profile/cordis.patch.yml",
 );
 const devClientPatch = await readFile(DEV_CLIENT_PATCH_PATH, "utf8");
 const UPSTREAM_PATCHES = ["base/cordis.patch.yml", "web-app/cordis.patch.yml"];
@@ -124,9 +124,9 @@ describe("桌面 overlay 的停用清单", () => {
     ]);
   });
 
-  it("源码 client 半的那一行单独一层，指向宿主自己的产物", async () => {
-    expect(insertedNames(devClientPatch)).toEqual(["../lib/dev-client-bundles.js"]);
-    const built = join(repoRoot, "packages/desktop/dsh-desktop-host/lib/dev-client-bundles.js");
+  it("前端服务那一行单独一层，按包名指到 @morlay/dsh-client-modules", async () => {
+    expect(insertedNames(devClientPatch)).toEqual(["@morlay/dsh-client-modules"]);
+    const built = join(repoRoot, "packages/client/dsh-client-modules/dist/index.js");
     if (await pathExists(built)) expect((await stat(built)).isFile()).toBe(true);
   });
 
@@ -135,7 +135,8 @@ describe("桌面 overlay 的停用清单", () => {
   });
 
   it("传输接管的两处配置仍在（无端口 webServer + web-runtime 全项）", () => {
-    expect(insertedNames(patch)).toEqual(["../lib/webserver.js"]);
+    // webServer 的实现由宿主按**源码**装配（宿主挂着 TS loader）：指向 `src/webserver.ts`。
+    expect(insertedNames(patch)).toEqual(["../src/webserver.ts"]);
     expect(configuredIds(patch)).toEqual(["web-runtime"]);
     expect(targetedIds(patch)).toContain("web-runtime");
   });

@@ -4,7 +4,7 @@
 //
 // 装配走官方那两步（`loadProfileDirectory` + `runProfile`）：打包形态的 profile 由工具按官方形态
 // 种出（见 `../.agents/designs/20260929-桌面host的运行时面与依赖边界.md`）；dev 形态由启动器把
-// app 目录当 profile root 传进来（同一份清单，见 `../../dsh-desktopify/.agents/designs/20261010-app目录即profile-root.md`）。
+// app 目录当 profile root 传进来（同一份清单，见 `../../dshdev/.agents/designs/20261010-app目录即profile-root.md`）。
 
 import { once } from "node:events";
 import { createReadStream, createWriteStream, type ReadStream, type WriteStream } from "node:fs";
@@ -28,6 +28,8 @@ import {
 } from "./transport.ts";
 import { applyInspectorCommand, closeInspectorEndpoint } from "./inspector.ts";
 import { installDevtoolsAssets } from "./devtools-assets.ts";
+import { installPreloadSource } from "./preload-source.ts";
+import { startLoopbackUpgradeServer } from "./ws-bridge.ts";
 import { PortlessWebServer } from "./webserver.ts";
 import {
   DESKTOP_HOST_PROTOCOL_VERSION,
@@ -45,10 +47,10 @@ import {
 } from "./wire.ts";
 
 const DESKTOP_PATCH = fileURLToPath(new URL("../config/desktop.cordis.patch.yml", import.meta.url));
-// 源码面的 client 现场打包行单独一层：web 形态（）也要挂它，
-// 但不要桌面专属的那几层。
+// 前端服务（`@morlay/dsh-client-modules`）单独一层：**两种形态**都要挂它（dev 由工具按
+// `dsh.bundle.patch` 挂、打包形态随 app 的 `dsh.profile.bundles` 进 profile），但不要桌面专属的那几层。
 const DEV_CLIENT_PATCH = fileURLToPath(
-  new URL("../config/dev-client-bundles.cordis.patch.yml", import.meta.url),
+  new URL(import.meta.resolve("@morlay/web-custom-profile/cordis.patch.yml")),
 );
 
 interface PendingRequest {
@@ -170,6 +172,12 @@ async function main(): Promise<void> {
   reportMemoryWhenAsked();
   // 调试窗口的前端产物：桌面档自己托管，不从上游 inspector 行取（那条路由与它的 Worker 绑在一起）。
   installDevtoolsAssets(ctx, [runtimeDir, profileDir]);
+  // preload 的源码由这里现场打成 CJS（sandboxed preload 只能 CJS），壳在窗口创建前取走——装配目录里
+  // 因此不再需要一份预产的 `dist/`。
+  const shellRoot = process.env["DSH_DESKTOP_SHELL_ROOT"];
+  if (shellRoot !== undefined && shellRoot !== "") {
+    installPreloadSource(ctx, { shellRoot });
+  }
   const webServer = ctx.get("webServer") as unknown as PortlessWebServer;
 
   const pending = new Map<number, PendingRequest>();
@@ -330,7 +338,12 @@ async function main(): Promise<void> {
       `gateway=${gateway === undefined ? "missing" : "present"} ` +
       `streamRoute=${DESKTOP_STREAM_PATH}`,
   );
-  send({ type: "ready", protocolVersion: DESKTOP_HOST_PROTOCOL_VERSION });
+  // 页面侧的 ws（`ws://app/…`）在自定义协议下无处可去：起一个进程内回环端点，把端口告诉壳（壳再经
+  // preload 交给页面），页面把它重写成 `ws://127.0.0.1:<port>/…` 就能直接用原生 WebSocket。
+  const wsEndpoint = await startLoopbackUpgradeServer(webServer);
+  // 这条链（含 vite 的 HMR）要从 webServer 上取到它：没有别的同源 http server 可挂升级。
+  (webServer as unknown as { desktopUpgradeServer?: unknown }).desktopUpgradeServer = wsEndpoint.server;
+  send({ type: "ready", protocolVersion: DESKTOP_HOST_PROTOCOL_VERSION, wsPort: wsEndpoint.port });
 }
 
 if (import.meta.main) {
