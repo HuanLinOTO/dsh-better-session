@@ -30,7 +30,7 @@
 - **client 半的开发态出口回源**：`./client` 就是一条指 `src/client/index.ts` 的字符串（不是
   `{ types, default }` 那种两份同值的形态）——与 host 面同一条规则。上游把这个路径拼成绝对路径后
   **直接读字节**（浏览器模块工厂执行的就是那份字节），那份 TS 由 `dev-client-bundles`
-  （`dsh-desktopify dev` 装进 profile 的那一行）现场转换；**发布态**才写成 `{ types, default }` 取
+  （`dshdev dev` 装进 profile 的那一行）现场转换；**发布态**才写成 `{ types, default }` 取
   `dist/client.cjs`——CJS 单文件：多文件产物会破坏 ModuleLoader 手递，约束与理由见
   [ADR-20260917-客户端bundle单文件与shadow渲染替换](../../packages/session/ui-conversation-message-actions/.agents/adrs/20260917-客户端bundle单文件与shadow渲染替换.md)。
 - **跨包共享的测试辅助走 `./testing`**，不进 host 面。
@@ -43,13 +43,13 @@
   在 `build:done` 里按**入口**推导后写回 `package.json`——顶层指源码（workspace 内直连 `src`），发布态
   指产物；手改这两段会在下次 `just build` 被覆盖。要加一个面就加一个入口（`src/<面>.ts` +
   `tsdown.config.ts` 的 `entries`）。入口约定、生成规则与理由都在
-  [`devpackages/devkit/src/package-exports.ts`](../../devpackages/devkit/src/package-exports.ts)。
+  [`devpackages/tsdown-plugin-cordis/src/package-exports.ts`](../../devpackages/tsdown-plugin-cordis/src/package-exports.ts)。
 - **client 半只有一个形态（发布态）**：它是 CJS 单文件 bundle，出口固定写成 `{ types, default }`，**不参与
   ESM / CJS 的格式推导**——让推导去猜，它会把 `client.cjs` 当成 `.` 的 require 变体，包根出口就指到了
   client 半。
 - **固定面按文件存在性补**：`./package.json` 一律在；`./cordis.patch.yml` 有该文件才有；`./locale/*.json`
   有 `locale/en.json` 才有。守卫见
-  `devpackages/devkit/src/__tests__/publish-exports.spec.ts`（发布态的键集合必须覆盖顶层的键集合——
+  `devpackages/tsdown-plugin-cordis/src/__tests__/publish-exports.spec.ts`（发布态的键集合必须覆盖顶层的键集合——
   `publishConfig.exports` 是**整体替换**顶层 `exports`，漏一个键就是发布包少一个面，
   `@morlay/dsh-desktop-host` 的 `./package.json` 就这样丢过：
   `import.meta.resolve("<包名>/package.json")` 抛 `ERR_PACKAGE_PATH_NOT_EXPORTED`，桌面打包整个起不来）。

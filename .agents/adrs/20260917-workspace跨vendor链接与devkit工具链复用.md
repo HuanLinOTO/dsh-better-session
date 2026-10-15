@@ -59,7 +59,7 @@ autoInstallPeers: true
 - **样式内联自己实现，不复用 vendor 的同一份逻辑**：上游那三个插件内联在未导出的
   `clientConfig` 里（导出面只有 `clientBundle`），复用会拖进 `REPOSITORY_ROOT`、
   `packages/*/*` 清单扫描、`PLATFORM_MODULES` 等上游仓库内部路径。代价是语义有一份
-  重复，由 devkit 自己的单测钉住（`devpackages/devkit/src/__tests__/css.spec.ts`，
+  重复，由 devkit 自己的单测钉住（`devpackages/tsdown-plugin-cordis/src/__tests__/css.spec.ts`，
   含「样式 import 不残留」「class 映射与上游同形」「watch 图登记」）；`resolveId` 用
   `order: 'pre'`（与上游 client 构建同一口径）。
 
@@ -77,7 +77,7 @@ autoInstallPeers: true
 - 新插件包脚手架 = 一行 tsdown 配置（根 tsconfig 已 extends devkit），无
   模板复制。
 - devkit 是 TS 源码直出（`exports: { ".": "./src/index.ts", "./tsconfig.json":
-  "./tsconfig.json" }`，另有 `./dts` 与 `./ts-loader`（后者是打包产物随包载荷的源）），由 tsdown / 自带的 oxc
+  "./tsconfig.json" }`，另有 `./dts`），由 tsdown / 自带的 oxc
   loader 等 TS 加载器消费，无需自身构建链。
 - 已知限制（样式内联只覆盖**代码**图，不覆盖 client 的**声明**图）：client 入口把
   `?inline` 的文本**再导出**时，tsdown 的 dts 这一步失败——生成的 `.d.ts` 保留
