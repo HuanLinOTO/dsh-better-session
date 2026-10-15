@@ -26,7 +26,13 @@ export type AppProfileBoot = Awaited<ReturnType<typeof runProfile>>;
 //
 // 以前指 `<runtimeDir>/node_modules/@deepseek-ai/dsh/package.json`——那是 runtime 还带着一份完整闭包的年代。
 // runtime 现在只放工具链（`node` / `pnpm` / loader），依赖面由随包 tar 解压进 profile，锚点跟着那份走。
-function installAnchorOf(profileDir: string): string {
+/**
+ * 闭包根（安装锚点）：官方 bundles 与 `dsh` 都由它解析。
+ *
+ * @param profileDir - profile 根（它的 `node_modules` 里是随包 tar 解压出来的完整闭包）。
+ * @returns 锚点清单的绝对路径。
+ */
+export function installAnchorOf(profileDir: string): string {
   return join(profileDir, "node_modules", "@deepseek-ai", "dsh", "package.json");
 }
 

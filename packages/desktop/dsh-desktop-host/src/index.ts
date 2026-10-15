@@ -8,7 +8,7 @@
 
 import { once } from "node:events";
 import { createReadStream, createWriteStream, type ReadStream, type WriteStream } from "node:fs";
-import { join } from "node:path";
+import { installAnchorOf } from "./app-boot.ts";
 import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import {
@@ -141,7 +141,9 @@ async function main(): Promise<void> {
     }
   };
 
-  const installAnchor = join(runtimeDir, "node_modules", "@deepseek-ai", "dsh", "package.json");
+  // 闭包根 = **profile 自己**的 `node_modules`（随包 tar 解压出来的那份）：官方 bundles 与 `dsh` 由它解析。
+  // runtime 只放工具链，锚点挂过去会当场 `ENOENT: realpath …/runtime/node_modules/@deepseek-ai/dsh`。
+  const installAnchor = installAnchorOf(profileDir);
   const profile = loadProfileDirectory("dsh", profileDir, installAnchor);
   // 加载跳过原因由启动方上报（与上游 desktop-host 同一口径）。
   reportSkippedBundles("dsh", profile);
