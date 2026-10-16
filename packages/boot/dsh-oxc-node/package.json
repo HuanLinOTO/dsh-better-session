@@ -1,0 +1,37 @@
+{
+  "name": "@morlay/dsh-oxc-node",
+  "version": "0.2.6-alpha.0",
+  "description": "本仓库的 TS 运行时入口：注册 hooks 后 Node 也能跑 node_modules 下的 .ts（ESM only）。壳与宿主按路径取用（工具把它装进随包运行时）。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "typescript",
+    "loader",
+    "oxc"
+  ],
+  "license": "MIT",
+  "author": "morlay",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/morlay/dsh-plugin.git"
+  },
+  "files": [
+    "register.mjs"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./register.mjs"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./register.mjs"
+    }
+  },
+  "dependencies": {
+    "@oxc-project/runtime": "^0.154.0",
+    "oxc-transform": "^0.154.0"
+  },
+  "engines": {
+    "node": ">=24.11.0"
+  }
+}

@@ -1,6 +1,6 @@
 # 自研 app-boot：切开对 `@deepseek-ai/dsh` 的依赖
 
-状态：**设计已定，实现待做**（本文是施工图；新包代码尚未落地）。
+状态：**已实现**（`bootAppProfile` 与 `runProfile` 落在 `packages/boot/dsh-app-boot/src/`；落地方案见文末「落地记录」）。
 范围：新建 `packages/boot/dsh-app-boot`（包名 `@morlay/dsh-app-boot`），替代
 `@deepseek-ai/dsh-app-boot`（装配）与 `@deepseek-ai/dsh/profile-boot`（`runProfile`）；并迁移
 `@morlay/dsh-desktop-host`、`@local/dshdev`、`@local/devkit` 的使用点。
@@ -68,7 +68,7 @@ function readPluginMeta(name: string, manifestUrl: string): PluginMeta | undefin
 
 | 位置 | 现在 | 换成 |
 | --- | --- | --- |
-| [`packages/desktop/dsh-desktop-host/src/app-boot.ts`](../../../../desktop/dsh-desktop-host/src/app-boot.ts) | `dsh-app-boot` + `dsh/profile-boot` | `@morlay/dsh-app-boot` |
+| dsh-desktop-host 原先那份 `app-boot.ts`（**已删除**，逻辑搬进本包） | `dsh-app-boot` + `dsh/profile-boot` | **已换**：[`src/app-profile.ts`](../../src/app-profile.ts) 与 [`src/profile-boot.ts`](../../src/profile-boot.ts) |
 | [`packages/desktop/dsh-desktop-host/src/web.ts`](../../../../desktop/dsh-desktop-host/src/web.ts) | 同上 | 同上 |
 | [`devpackages/dshdev/src/cli/check-locale.ts`](../../../../../devpackages/dshdev/src/cli/check-locale.ts) | `readPluginMeta` | 自研 `readPluginMeta` |
 | [`devpackages/devkit/src/__tests__/plugin-icon.spec.ts`](../../../../../devpackages/devkit/src/__tests__/plugin-icon.spec.ts) | `readPluginMeta` | 同上 |
@@ -81,8 +81,18 @@ function readPluginMeta(name: string, manifestUrl: string): PluginMeta | undefin
    —— 这条测试必须在"patch 按 id 覆盖失效"时失败，它就是当前 bug 的回归网。
 2. **本地**：`dshdev web --prod` 起得来且页面 200；`dshdev desktop --prod` 同。
 
-## 风险与第一刀
+## 落地记录（第一刀怎么切的）
 
-最大未知是 `PluginPackages`（依赖包 → entries 的推导）：不复刻它，bundle 的 `dependencies` 就不会成为行，
-官方 bundles 直接失效。**第一刀先做这件事**：读 `app-boot/src/index.ts:540` 的 `mountRootInclude` 与
-`plugin-packages` 的实现，把"最小复刻面"写清（是照抄几十行，还是这层也必须借上游），再动手写新包。
+原先担心的未知是 `PluginPackages`（依赖包 → entries 的推导）与 `mountRootInclude`：不复刻它们，bundle 的
+`dependencies` 就不会成为行，官方 bundles 直接失效。实际落地的切法是——**这两层继续用上游**：
+
+- 借上游 `@deepseek-ai/dsh-app-boot` 的 `boot` / `loadProfileDirectory` / `readProfilePatches` /
+  `createRuntimeResolution` / `loadOverlayPatches` / `installFailLoud` / `PluginPackages`（公开包，可依赖）；
+- 自研只有**组合与外壳**：层序、要 provide 的服务面（`profileContext` 在自研侧，`cmdlineArgs`/`appExit`/
+  `appReady` 继续用 `dsh-cmdline` 的 `provideCmdline`）、fail-loud 接线与本包自带的
+  [`有界退出控制器`](../../src/process-shutdown.ts)；
+- 于是对 `@deepseek-ai/dsh`（vendor 里那个 private 的 `apps/cli`）的依赖归零，而"哪一层生效"的规则仍在上游
+  那一层——若将来要改 patch 与 insert 的 id 匹配语义，那才是需要动 `boot` 那一步的时候。
+
+已核验：dev 形态经本包起树、页面 HTTP 200（`PORT=3082 dshdev web apps/dsh-custom-next`）；全仓测试与
+`just lint` 干净。
