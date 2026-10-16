@@ -53,4 +53,4 @@ patch / 设置页都可）：
 ```
 
 上游 settings 只投影 volatile 字段做表单编辑，改动持久化回 entry config，不再覆盖插件 config，见
-[ADR-20260922-跟随上游session-format-v4](../../session/session-rdb/.agents/adrs/20260922-跟随上游session-format-v4.md)。
+[ADR-跟随上游session-format](../../session/session-rdb/.agents/adrs/20260917-跟随上游session-format.md)。
