@@ -288,8 +288,12 @@ export function apply(ctx: Context): void {
     await viteStarting;
     if (!announced) {
       announced = true;
-      const port = process.env["PORT"] ?? "3080";
-      process.stdout.write(`\n  ➜  Local:   http://127.0.0.1:${port}/\n\n`);
+      // 端口是**宿主自己 listen 的那个**（缺省 `0` = 由系统分配），不是 `PORT` 环境变量——它只在"显式指定"
+      // 时才有值，跟着它打印会在随机端口下报出一个并不存在的 3080。
+      const port = (webServer as { port?: number }).port;
+      if (port !== undefined) {
+        process.stdout.write(`\n  ➜  Local:   http://127.0.0.1:${String(port)}/\n\n`);
+      }
     }
   };
 
