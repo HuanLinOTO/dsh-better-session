@@ -34,12 +34,19 @@
   disabled: true
 
 # **本部署不要账号 UI**：上游 `ui-settings-account` 那一行渲染设置页的账号页、侧栏账号菜单与首次引导层。
-# 它同时还是那个 settings namespace 的 owner——所以不能光停它：由 profile 档
-# [`@morlay/mydsh-profile`](../../../bundles/mydsh-profile/src/index.ts) 补一个"空壳"注册（同样的
-# `settings.configure({ auto: false })`，不渲染任何界面）。
+# 它同时还是那个 **settings namespace 的 owner**——光停它，前端镜面就拿不到名册（`describeFace.view
+# === undefined`）→ 直接 failLoad，整个设置页判 "settings are unavailable in this browser"，连
+# `/api/settings` 都不请求。所以停它的同时，由下面那行**顶上同一个注册**（不渲染任何界面）。
 #
 # **为什么停用必须写在这里**：实测，写在 bundle 层的停用会被后来应用的层盖回去；这份 overlay 由宿主追加在
 # `patchFiles` 末尾（`src/index.ts:80`），是最后应用的一层。
 
 - id: ui-settings-account
   disabled: true
+
+# 顶替上面那行不可省的那件事：注册 settings namespace（同样的 `settings.configure({ auto: false })`，
+# 不渲染账号页/侧栏菜单/引导层）。实现见 [`../src/settings-namespace.ts`](../src/settings-namespace.ts)。
+
+- insert:
+    - id: settings-namespace
+      name: "../src/settings-namespace.ts"

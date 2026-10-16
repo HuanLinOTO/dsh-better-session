@@ -24,10 +24,10 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./webserver": "./src/webserver.ts",
     "./preload-source": "./src/preload-source.ts",
     "./wire": "./src/wire.ts",
     "./paths": "./src/paths.ts",
+    "./settings-namespace": "./src/settings-namespace.ts",
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json"
   },
@@ -36,10 +36,6 @@
       ".": {
         "types": "./dist/index.d.mts",
         "default": "./dist/index.js"
-      },
-      "./webserver": {
-        "types": "./dist/webserver.d.mts",
-        "default": "./dist/webserver.js"
       },
       "./preload-source": {
         "types": "./dist/preload-source.d.mts",
@@ -53,6 +49,10 @@
         "types": "./dist/paths.d.mts",
         "default": "./dist/paths.js"
       },
+    "./settings-namespace": {
+      "types": "./dist/settings-namespace.d.mts",
+      "default": "./dist/settings-namespace.js"
+    },
       "./package.json": "./package.json",
       "./locale/*.json": "./locale/*.json"
     }

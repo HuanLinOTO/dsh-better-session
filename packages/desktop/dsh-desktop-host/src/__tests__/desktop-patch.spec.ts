@@ -28,10 +28,6 @@ async function pathExists(path: string): Promise<boolean> {
 const patch = await readFile(PATCH_PATH, "utf8");
 
 // 停用/配置的目标行 id（顶层 `- id:`，不含 insert 出来的行）。
-function targetedIds(text: string): string[] {
-  return [...text.matchAll(/^- id: (\S+)$/gm)].map((match) => match[1]!);
-}
-
 function disabledIds(text: string): string[] {
   return [...text.matchAll(/^- id: (\S+)\n {2}disabled: true$/gm)].map((match) => match[1]!);
 }
@@ -133,9 +129,10 @@ describe("桌面 overlay 的停用清单", () => {
     // 以前这里禁掉 `webserver` 并插一个"无端口替身"（请求走字节管道喂进来）。那条路没有 origin，
     // 基于 URL/WS 的东西（settings 的 describe 流、账号的 stream mux、vite 的 HMR）拿不到答复——
     // 现在照常 listen，壳用它的 origin 载入窗口。
-    expect(insertedNames(patch)).toEqual([]);
+    expect(insertedNames(patch)).toEqual(["../src/settings-namespace.ts"]);
     expect(disabledIds(patch)).not.toContain("webserver");
     expect(configuredIds(patch).sort()).toEqual(["web-runtime", "webserver"]);
+    // 插入的那一行是"账号面空壳"：顶替被停掉的 `ui-settings-account` 那个 settings namespace 注册。
     // 端口必须随机：上游 `web-app` 给的是 `webStartup.port ?? 3080`，桌面没有 `--port`，于是落到 3080
     // ——两个实例或本机别的工具占了它，第二次就起不来。
     expect(portOfWebServer(patch)).toBe(0);
