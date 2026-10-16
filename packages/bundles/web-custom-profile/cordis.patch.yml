@@ -8,10 +8,10 @@
     - id: client-modules
       name: "@morlay/dsh-client-modules"
 
-# `web-runtime` 挂着 `frontend-static`（服务**构建产物**里的 index.html，占兜底位）——dev 形态下页面与资源
-# 全归 vite，这一行连同它挂的兜底一起用不到；而且兜底位只有一个，留着它 vite 就没位置可占。
-- id: web-runtime
-  disabled: true
+# `web-runtime` **保留**：它同时管两件事——挂 `frontend-static`（服务构建产物里的 index.html，占兜底位）
+# 与**打印 URL、交接默认浏览器**。以前为"不让兜底位跟 vite 抢"把整行停掉，代价是那两件也一起没了
+# （启动后既没有地址行、也不会打开浏览器）。现在留着它：dev 形态下页面仍归 vite，`frontend-static`
+# 只在它自己的路由与兜底上存在，两者按注册顺序共存。
 
 # 上游这两行在 dev 形态下用不到，**整行停用**（含它们提供的服务）：
 # · `client-modules`——combo 打包、工厂引导器、`/plugins` 路由与**模块表 roster**（`modules` 服务）都在
