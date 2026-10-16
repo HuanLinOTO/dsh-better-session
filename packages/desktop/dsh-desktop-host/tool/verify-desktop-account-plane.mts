@@ -26,17 +26,11 @@
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  loadLayeredEnv,
-  loadProfileDirectory,
-  reportSkippedBundles,
-} from "@deepseek-ai/dsh-app-boot";
-import { runProfile } from "@deepseek-ai/dsh/profile-boot";
+import { bootAppProfile } from "@morlay/dsh-app-boot";
 
 const repoRoot = fileURLToPath(new URL("../../../..", import.meta.url));
 const store = join(repoRoot, "apps/dsh-custom-next/.dsh-store");
 const profileDir = join(store, "profiles", "web");
-const installAnchor = join(repoRoot, "vendor/deepseek-harness/apps/cli/package.json");
 const DESKTOP_PATCH = fileURLToPath(new URL("../config/desktop.cordis.patch.yml", import.meta.url));
 
 // 凭据解析探针用的临时值（只进进程环境，不写任何 store）。
@@ -101,13 +95,9 @@ if (!profileReady) {
 process.env.DSH_HOME = store;
 process.env.OLLAMA_API_KEY = PROBE_API_KEY;
 
-const profile = loadProfileDirectory("dsh", profileDir, installAnchor);
-reportSkippedBundles("dsh", profile);
-
-const { ctx, shutdown } = await runProfile({
-  environment: loadLayeredEnv("dsh"),
+const { ctx, shutdown } = await bootAppProfile({
+  profileDir,
   profile: "desktop",
-  resolvedProfile: { profile, installAnchor },
   patchFiles: [DESKTOP_PATCH],
   args: ["--no-open"],
 });

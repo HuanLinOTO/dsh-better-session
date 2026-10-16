@@ -28,6 +28,7 @@ if (
   location.protocol === `${scheme}:` &&
   location.hostname === "app"
 ) {
+// preload 脚本**跑在页面里**（浏览器没有 cordis 树，也没有壳的日志出口）：这里的 console 是页面日志。
   console.log(`[dsh-shell] preload: scheme=${String(scheme)} wsPort=${String(wsPort)} webFrame=${typeof webFrame}`);
   if (wsPort !== undefined && wsPort !== "") {
     // 页面是 web 与桌面共用的，而这条垫片只对桌面形态有意义：在渲染进程最早的一刻把它注入**主 world**

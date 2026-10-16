@@ -7,7 +7,7 @@
 import { once } from "node:events";
 import { createReadStream, createWriteStream, type ReadStream, type WriteStream } from "node:fs";
 import type { Context } from "@deepseek-ai/cordis";
-import type { AppProfileBoot } from "./app-boot.ts";
+import type { AppProfileBoot } from "@morlay/dsh-app-boot";
 import { applyInspectorCommand, closeInspectorEndpoint } from "./inspector.ts";
 import { errorMessage, fatalEvent } from "./fatal.ts";
 import type { PortlessWebServer } from "./webserver.ts";
@@ -68,7 +68,7 @@ export function connectDesktopIpc(options: DesktopIpcOptions): DesktopIpc {
   let closing = false;
   responsePipe.on("error", (error) => {
     if (!closing) {
-      console.error(error);
+      ctx.logger.error(error);
       process.exitCode = 1;
     }
   });
@@ -103,6 +103,20 @@ export function connectDesktopIpc(options: DesktopIpcOptions): DesktopIpc {
     entry: PendingRequest,
   ): Promise<void> => {
     try {
+      // 页面现在从**真 webServer 的 origin**（`http://127.0.0.1:<port>`）载入，请求直连它——这条字节管道
+      // 不再承载任何请求（壳侧即使还写着也没人需要）。这里不再去摸 `dispatch`：真 webServer 没有这个方法，
+      // 而以前那个"无端口替身"才提供它。
+      if (typeof (webServer as { dispatch?: unknown }).dispatch !== "function") {
+        await writeResponse(encodeDesktopResponseStart(streamId, {
+          status: 404,
+          headers: [["content-type", "text/plain; charset=utf-8"]],
+          hasBody: true,
+        }));
+        await writeResponse(encodeDesktopResponseData(streamId, Buffer.from("not found")));
+        await writeResponse(encodeDesktopResponseEnd(streamId));
+        pending.delete(streamId);
+        return;
+      }
       const response = await webServer.dispatch(request);
       await writeResponse(
         encodeDesktopResponseStart(streamId, {

@@ -1,19 +1,10 @@
-# 桌面形态的传输接管：上游 `webserver` 行在激活时 listen，桌面没有网络入口，
-# 这里禁用它并插入宿主内的无端口替身（同服务名 `webServer`、同一份路由面，
-# 请求由字节管道经 dispatch 喂进来）。其余行沿用 web-app bundle。
+# 桌面形态**不再替换** `webserver`：以前这里禁用它、插一个"无端口替身"，让请求走字节管道喂进来——
+# 那样没有 origin（不是真的 `http://host:port`），而基于 URL/WS 的东西（settings 的 `describe` 流、
+# 账号的 stream mux、vite 的 HMR）拿不到答复，表现为"设置页永远不可用、连请求都看不到"。
+# 现在回到上游的做法：**照常 listen（随机端口）**，壳用它的 origin 载入窗口。
 #
 # `web-runtime` 的四项一并写全：patch 整块替换 config，没有端口可打印、也没有
 # 浏览器可交接；`surfaceContext` 关掉，免得提示段带一个并不存在的 URL。
-
-- id: webserver
-  disabled: true
-
-- insert:
-    - id: portless-webserver
-      name: "../src/webserver.ts"
-      config:
-        host: "127.0.0.1"
-        port: 0
 
 - id: web-runtime
   config:
@@ -34,33 +25,13 @@
 - id: product-analytics
   disabled: true
 
-# 桌面档不含登录，账号面整条停掉。DeepSeek 账号登录是「系统浏览器授权 + 回环地址回调」：
-# 上游 `dsh-deepseek-account-platform` 在 webServer 上注册 `/oauth/callback`，授权页要回到
-# `http://localhost:<端口>/oauth/callback`——而本部署的 webServer 没有端口（上面的
-# portless-webserver），回调没有入口；client 半算出的回调来源是页面的自定义协议来源，
-# 连协议校验都过不了。装着的那几个面点进去只会撞死路，于是按 id 停掉：
+# **本部署不要账号 UI**：上游 `ui-settings-account` 那一行渲染设置页的账号页、侧栏账号菜单与首次引导层。
+# 它同时还是那个 settings namespace 的 owner——所以不能光停它：由 profile 档
+# [`@morlay/mydsh-profile`](../../../bundles/mydsh-profile/src/index.ts) 补一个"空壳"注册（同样的
+# `settings.configure({ auto: false })`，不渲染任何界面）。
 #
-# - `deepseek-account`：登录实现（凭据记录、事务面与浏览器流程的宿主一半）；
-# - `account-controller`：账号事务的 Remote 名册，硬注入 `deepseekAccount`，登录实现停了
-#   它只会等一个不会出现的服务；
-# - `llm-deepseek-account`：账号 token 独占的模型路由，token 只可能来自上面那条登录，
-#   留着则是一条永远 `ACCOUNT_SIGN_IN_REQUIRED` 的死路由；
-# - `ui-settings-account`：账号的 client 面（设置页的账号页、侧栏账号菜单、桌面首次引导
-#   覆盖层、充值页宿主），并且是 `ui-settings-account` 这个 settings namespace 的 owner。
-#
-# 留下的仍是本部署的模型路径：`credentials`（通用凭据服务）与 `llm-deepseek`（官方 API key
-# 路由，不是登录）都不动——模型走 ollama provider，key 由 `credentials` 解析
-# `apiKeyEnv: OLLAMA_API_KEY`（profile 层给的）。
-
-- id: deepseek-account
-  disabled: true
-
-- id: llm-deepseek-account
-  disabled: true
-
-- id: account-controller
-  disabled: true
+# **为什么停用必须写在这里**：实测，写在 bundle 层的停用会被后来应用的层盖回去；这份 overlay 由宿主追加在
+# `patchFiles` 末尾（`src/index.ts:80`），是最后应用的一层。
 
 - id: ui-settings-account
   disabled: true
-

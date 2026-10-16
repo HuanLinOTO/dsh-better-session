@@ -317,7 +317,7 @@ export class PortlessWebServer extends Service {
     }
     const handler = this.match(pathname)?.handler ?? this.fallback;
     if (process.env.DSH_DESKTOP_DEBUG === "1")
-      console.error(
+      this.ctx.logger.debug(
         `[dsh-desktop] dispatch ${request.method} ${pathname} → ${handler === undefined ? "404" : "handler"}`,
       );
     if (handler === undefined) return new Response("not found", { status: 404 });

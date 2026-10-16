@@ -5,7 +5,7 @@
 import { once } from "node:events";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { TypertGatewayWireStream } from "@deepseek-ai/dsh-api-gateway";
-import type { Context } from "@deepseek-ai/cordis";
+import type { Context, LoggerService } from "@deepseek-ai/cordis";
 import { DESKTOP_STREAM_PATH, DesktopStreamBodyDecoder } from "./wire.ts";
 
 export { DESKTOP_STREAM_PATH } from "./wire.ts";
@@ -21,6 +21,7 @@ export const desktopStreamStats = {
 };
 
 // 注入 index 的 transport 行：声明页面拥有 Host，并给出 Gateway 流载体（下行流 + 上行项）。
+// 这份脚本里的 `console.*` 是**页面里**跑的代码（浏览器没有 cordis 树），不是宿主日志。
 export const DESKTOP_TRANSPORT_SCRIPT = `globalThis.__DSH_TRANSPORT__={
   _desktop:true,
   ownsHost:true,
@@ -154,9 +155,9 @@ function parseStreamOpening(value: unknown, subject: string): StreamOpening {
   return { endpoint: value.endpoint, payload: value.payload ?? { args: {} } };
 }
 
-// 诊断行：桌面流是连接就绪的唯一来源，出问题时先看宿主 stderr 的这几行。
-function reportStreamFailure(subject: string, detail: unknown): void {
-  console.error(`[dsh-desktop] ${subject}: ${errorText(detail)}`);
+// 诊断行：桌面流是连接就绪的唯一来源，出问题时先看这几行——走这条树的 logger（由调用方给）。
+function reportStreamFailure(subject: string, detail: unknown, log: LoggerService): void {
+  log.error(`[dsh-desktop] ${subject}: ${errorText(detail)}`);
 }
 
 function errorText(value: unknown): string {
@@ -172,7 +173,7 @@ function streamHandler(ctx: Context): (req: IncomingMessage, res: ServerResponse
     }
     const gateway = ctx.get("typertGateway") as unknown as GatewaySurface | undefined;
     if (gateway === undefined) {
-      reportStreamFailure("stream failed", "typertGateway service is missing");
+      reportStreamFailure("stream failed", "typertGateway service is missing", ctx.logger);
       response.writeHead(503);
       response.end("gateway unavailable");
       return;
@@ -192,7 +193,7 @@ function streamHandler(ctx: Context): (req: IncomingMessage, res: ServerResponse
           )
         : parseStreamOpening(first.value, String(request.url));
     } catch (error) {
-      reportStreamFailure("stream body is not a valid opener", error);
+      reportStreamFailure("stream body is not a valid opener", error, ctx.logger);
       response.writeHead(400);
       response.end("invalid stream request");
       return;
@@ -205,7 +206,7 @@ function streamHandler(ctx: Context): (req: IncomingMessage, res: ServerResponse
     request.once("aborted", cancel);
     response.once("close", cancel);
     try {
-      console.error(`[dsh-desktop] stream opening ${endpoint}`);
+      ctx.logger.debug(`[dsh-desktop] stream opening ${endpoint}`);
       // 上游契约是五参：`uplink` 是「客户端 → 宿主」的逻辑流输入，`$events` 那类 Gateway 自己的流
       // 会被上游立刻释放（`releaseUplink`）。
       const values = await gateway.wireStream.open(
@@ -215,7 +216,7 @@ function streamHandler(ctx: Context): (req: IncomingMessage, res: ServerResponse
         undefined,
         abort.signal,
       );
-      console.error(`[dsh-desktop] stream opened ${endpoint}`);
+      ctx.logger.debug(`[dsh-desktop] stream opened ${endpoint}`);
       response.writeHead(200, {
         "content-type": "application/x-ndjson",
         "cache-control": "no-store",
@@ -243,7 +244,7 @@ function streamHandler(ctx: Context): (req: IncomingMessage, res: ServerResponse
       }
     } catch (error) {
       desktopStreamStats.failed += 1;
-      reportStreamFailure(`stream ${endpoint} failed`, error);
+      reportStreamFailure(`stream ${endpoint} failed`, error, ctx.logger);
       if (response.headersSent) {
         response.destroy(error instanceof Error ? error : new Error(String(error)));
         return;

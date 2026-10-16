@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -63,13 +63,16 @@ async function upstreamModules(): Promise<Map<string, string>> {
 
 const upstream = await upstreamModules();
 
-// 桌面档**必须**停的登录/账号面，以及它停的到底是哪个模块。
-const ACCOUNT_ROWS = {
-  "deepseek-account": "@deepseek-ai/dsh-deepseek-account-platform",
-  "account-controller": "@deepseek-ai/dsh-api-account-controller",
-  "llm-deepseek-account": "@deepseek-ai/dsh-llm-deepseek-account",
+// 账号面的取舍**不在桌面档**：本部署不含登录，那几条由 profile 档
+// [`@morlay/mydsh-profile`](../../../bundles/mydsh-profile/tsdown.config.ts) 停（web 形态也同样受益）。
+// 桌面档这里只停"桌面形态"自己的两件事：传输接管（`webserver` → `portless-webserver`）与产品遥测。
+//
+// 为什么非要分家：应用顺序是 `bundle 层 → overlay`，而桌面 overlay 由宿主追加在 `patchFiles` 末尾
+// （`src/index.ts:80`）——排最后、覆盖前面所有层。取舍写在 overlay 里，profile 档的同 id 设置就"改不动"。
+// 本部署不要账号 UI：停上游那一行，由 profile 档的空壳行补上它的 settings namespace 注册。
+const ACCOUNT_ROWS: Readonly<Record<string, string>> = {
   "ui-settings-account": "@deepseek-ai/dsh-client-ui-settings-account",
-} as const;
+};
 
 // 桌面档**必须**停的产品遥测面：两行只在 profile 名为 `desktop` 时激活，靠构建期环境变量
 // `DSH_CLIENT_VERSION` 填 `serviceVersion`（必填）；自研壳不传那个变量 → 遥测行配置校验失败、
@@ -86,16 +89,6 @@ const KEPT_ROWS = {
   "llm-deepseek": "@deepseek-ai/dsh-llm-deepseek-api-key",
 } as const;
 
-// 除桌面 overlay 之外的装配层：这些停用只该影响桌面档。
-async function otherPatchFiles(): Promise<string[]> {
-  const files: string[] = [];
-  for (const entry of await readdir(join(repoRoot, "packages/bundles"), { withFileTypes: true })) {
-    if (entry.isDirectory())
-      files.push(join(repoRoot, "packages/bundles", entry.name, "cordis.patch.yml"));
-  }
-  return files;
-}
-
 describe("桌面 overlay 的停用清单", () => {
   it("瞄准的上游行都存在，且行 id 现在确实指向那个模块", () => {
     for (const [id, module] of [
@@ -108,13 +101,15 @@ describe("桌面 overlay 的停用清单", () => {
     }
   });
 
-  it("停用清单就是传输接管那一行，加上产品遥测与登录/账号面", () => {
+  it("停用清单是产品遥测 + 账号 UI（后者由 profile 档的空壳行接替）", () => {
+    // 停用必须在 overlay：写在 bundle 层会被后来应用的层盖回去（实测），而 overlay 排最后。
+    // 停的是"账号 UI"那一行——它同时是 settings namespace 的 owner，所以由 profile 档补一个空壳注册。
     expect(disabledIds(patch).sort()).toEqual(
-      ["webserver", ...Object.keys(TELEMETRY_ROWS), ...Object.keys(ACCOUNT_ROWS)].sort(),
+      ["ui-settings-account", ...Object.keys(TELEMETRY_ROWS)].sort(),
     );
   });
 
-  it("停用的浏览器模块就是账号 client 面与产品分析", () => {
+  it("桌面档停的浏览器模块是产品分析与账号 UI", () => {
     const clientModules = [...Object.values(ACCOUNT_ROWS), ...Object.values(TELEMETRY_ROWS)].filter(
       (module) => module.startsWith("@deepseek-ai/dsh-client-"),
     );
@@ -134,21 +129,34 @@ describe("桌面 overlay 的停用清单", () => {
     for (const id of Object.keys(KEPT_ROWS)) expect(disabledIds(patch)).not.toContain(id);
   });
 
-  it("传输接管的两处配置仍在（无端口 webServer + web-runtime 全项）", () => {
-    // webServer 的实现由宿主按**源码**装配（宿主挂着 TS loader）：指向 `src/webserver.ts`。
-    expect(insertedNames(patch)).toEqual(["../src/webserver.ts"]);
+  it("不再替换 webServer，只留 web-runtime 的桌面配置", () => {
+    // 以前这里禁掉 `webserver` 并插一个"无端口替身"（请求走字节管道喂进来）。那条路没有 origin，
+    // 基于 URL/WS 的东西（settings 的 describe 流、账号的 stream mux、vite 的 HMR）拿不到答复——
+    // 现在照常 listen（随机端口），壳用它的 origin 载入窗口。
+    expect(insertedNames(patch)).toEqual([]);
+    expect(disabledIds(patch)).not.toContain("webserver");
     expect(configuredIds(patch)).toEqual(["web-runtime"]);
     expect(targetedIds(patch)).toContain("web-runtime");
   });
 
-  it("这些停用只在桌面 overlay 里出现（bundles 与 profile 层不受影响）", async () => {
-    const rows = [...Object.entries(ACCOUNT_ROWS), ...Object.entries(TELEMETRY_ROWS)];
-    for (const file of await otherPatchFiles()) {
-      const text = await readFile(file, "utf8");
-      for (const [id, module] of rows) {
-        expect(text, `${file} mentions ${id}`).not.toContain(id);
-        expect(text, `${file} mentions ${module}`).not.toContain(module);
-      }
+  it("停用各归其位：遥测与官方账号实现都在桌面 overlay（写在 bundle 层会被盖回去）", async () => {
+    const overlay = await readFile(
+      join(repoRoot, "packages/desktop/dsh-desktop-host/config/desktop.cordis.patch.yml"),
+      "utf8",
+    );
+    // 桌面 overlay 只管桌面形态自己那两件：传输接管与产品遥测。
+    for (const id of Object.keys(TELEMETRY_ROWS)) {
+      expect(overlay, `overlay 该停 ${id}`).toContain(id);
     }
+    // 账号实现必须在本 overlay 里（它是最后应用的一层）；写在 profile 档里会被后来应用的层盖回去。
+    for (const id of Object.keys(ACCOUNT_ROWS)) {
+      expect(overlay, `overlay 该停在 ${id}`).toContain(id);
+    }
+    const profile = await readFile(
+      join(repoRoot, "packages/bundles/mydsh-profile/cordis.patch.yml"),
+      "utf8",
+    );
+    // profile 档不承担停用（写那儿不生效）；它负责的是"空壳注册"。
+    expect(profile, "profile 档不该出现停用").not.toContain("disabled: true");
   });
 });

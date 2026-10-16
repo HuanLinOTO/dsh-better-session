@@ -66,19 +66,44 @@ async function extractProfileModules(archive: string, profileDir: string): Promi
 
 export const PROFILE_MODULES_ARCHIVE_NAME = "profile-node-modules.tar";
 
-export async function ensureSeedProfile(seedDir: string, home: string): Promise<boolean> {
+/** 一次"种 profile"的结果：调用方据此记录、并在打包形态把 `no-seed` 当致命。 */
+export type SeedOutcome = "seeded" | "up-to-date" | "no-seed";
+
+/** 依赖面是否真的在：`node_modules` 存在且非空。 */
+async function hasDependencies(profileDir: string): Promise<boolean> {
+  const modules = join(profileDir, "node_modules");
+  if (!(await isDirectory(modules))) return false;
+  return (await readdir(modules)).length > 0;
+}
+
+/**
+ * 把随包的种子种成一份可用的 profile：清单 + 各 bundle 自己的 patch 从种子拷（用户那份 patch 除外），
+ * **依赖面**由随包归档解压而来。种完才算数——调用方要等它返回才起宿主。
+ *
+ * 判"已是最新"要同时满足：指纹一致 **且** 依赖面真的在（归档在场时）。指纹只说明"清单与闭包是哪一份"，
+ * 不说明"它被解压出来了"：少了后半句，一次解压失败（或谁清过 `node_modules`）就永远补不回来，宿主会一直
+ * 带着残缺 profile 起来。
+ * @param seedDir - 随包的种子根（`Resources/seed`）。
+ * @param home - 数据面根（`$DSH_HOME`）；profile 落在 `<home>/profiles/<name>`。
+ * @returns 种了（`seeded`）、已是最新（`up-to-date`）、或随包根本没有这份种（`no-seed`）。
+ * @throws 归档解压失败、或解压后没有依赖面时。
+ */
+export async function ensureSeedProfile(seedDir: string, home: string): Promise<SeedOutcome> {
   const seedProfile = join(seedDir, "profiles", PROFILE_NAME);
-  if (!(await isDirectory(seedProfile))) return false;
+  if (!(await isDirectory(seedProfile))) return "no-seed";
   const profileDir = join(home, "profiles", PROFILE_NAME);
+  const archive = join(seedDir, PROFILE_MODULES_ARCHIVE_NAME);
+  const hasArchive = await pathExists(archive);
   const seedHash = await readSeedHash(join(seedProfile, SEED_HASH_NAME));
   if (seedHash !== "") {
     try {
       const stat = await lstat(profileDir);
       if (
         !stat.isSymbolicLink() &&
-        (await readSeedHash(join(profileDir, SEED_HASH_NAME))) === seedHash
+        (await readSeedHash(join(profileDir, SEED_HASH_NAME))) === seedHash &&
+        (!hasArchive || (await hasDependencies(profileDir)))
       ) {
-        return false;
+        return "up-to-date";
       }
     } catch {}
   }
@@ -99,16 +124,22 @@ export async function ensureSeedProfile(seedDir: string, home: string): Promise<
 
   // **profile 的依赖面**：随包那份归档解压进来（实体文件、闭包完整）。历史做法是壳按载荷清单逐包
   // `link:`——`link` 不带传递依赖（上千个包会丢），路径还指向构建机（`.pnpm/<pkg>@file++++Users+…`）。
-  const archive = join(seedDir, PROFILE_MODULES_ARCHIVE_NAME);
-  if (await pathExists(archive)) {
+  if (hasArchive) {
     await rm(join(profileDir, "node_modules"), { recursive: true, force: true });
     await extractProfileModules(archive, profileDir);
+    // **解压之后自检**：tar 退出码 0 不等于"闭包真的落地了"；种出来的东西不完整就该当场报，
+    // 而不是让宿主带着残缺 profile 起一次（那只能表现为"组件不完整"）。
+    if (!(await hasDependencies(profileDir))) {
+      throw new Error(
+        `dsh desktop: ${archive} did not yield a dependency closure at ${join(profileDir, "node_modules")}`,
+      );
+    }
   }
   if (userPatch !== undefined) {
     await mkdir(dirname(patchPath), { recursive: true });
     await writeFile(patchPath, userPatch);
   }
-  return true;
+  return "seeded";
 }
 
 // Plant one profile subtree. The seed's runtime lives beside the profile and stays in the

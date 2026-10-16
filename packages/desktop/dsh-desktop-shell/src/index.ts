@@ -1,7 +1,7 @@
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { format } from "node:util";
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol } from "./electron.ts";
 
 declare global {
@@ -57,7 +57,7 @@ function appConfigDir(): string {
 
 function startupFailure(error: unknown): never {
   const message = error instanceof Error ? error.message : String(error);
-  console.error(error);
+  void shellLog("入口失败或收尾失败 %o", error);
   void shellLog(`启动失败：${message}`);
   dialog.showErrorBox("dsh desktop startup failed", message);
   app.exit(1);
@@ -94,7 +94,6 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 
-const APPLICATION_URL = `${SCHEME}://app/`;
 
 // Windows 自绘标题栏高度（DIP），与 preload 写入的 CSS 变量一致。
 const WINDOWS_TITLEBAR_HEIGHT = 40;
@@ -116,22 +115,24 @@ function runtimeResources(): RuntimeResources {
   //   路径注入进来（dev 的宿主用系统 node，PATH 上就有）。
   const resourcesDir =
     developmentLayout() === undefined ? process.resourcesPath : join(shellRoot(), "..");
-  const node =
-    developmentLayout() === undefined
-      ? join(resourcesDir, "runtime", "node", process.platform === "win32" ? "node.exe" : "node")
-      : "node";
+  // 宿主的 node：打包形态用 **Electron 自己的二进制**（上游同款：`main.ts` 的 `const node = process.execPath`
+  // 与 `node-environment.ts` 的 `ELECTRON_RUN_AS_NODE`）。随包因此不再需要一份 node；而且宿主也能读 asar
+  // （asar 补丁在 `ELECTRON_RUN_AS_NODE` 下照样生效）——app 才能整块打进 asar。dev 形态用系统 node。
+  const node = developmentLayout() === undefined ? process.execPath : "node";
   const seed = join(resourcesDir, "seed");
   return {
     node,
     seed,
     // 随包运行时与 pnpm 只在打包产物里存在；dev 形态从工作区解析依赖。
-    runtime: join(seed, SEED_RUNTIME_DIR_NAME),
+    runtime: developmentLayout() === undefined
+      ? join(resourcesDir, "runtime")
+      : join(seed, SEED_RUNTIME_DIR_NAME),
     pnpm: join(resourcesDir, "runtime", "pnpm", "bin", "pnpm.mjs"),
     nodeBin: join(resourcesDir, "runtime", "bin"),
-    // 随包载荷就是 `@oxc-node/core` 的 register（与工作区那条 `--import` 同一份实现）。
-    // TS 运行时入口：**按包名解析**（`@local/oxc-node` 是壳的依赖，dev 的装配目录与打包的 app 目录里都装了
-    // 它）。不再由工具注入路径，也不依赖"随包 runtime 里那份拷贝"的布局。
-    loader: fileURLToPath(import.meta.resolve("@local/oxc-node")),
+    // TS 运行时入口：**按路径取随包运行时里的那一份**（工具在备 runtime 时把 `@morlay/dsh-oxc-node` 的
+    // `register.mjs` 连同它的依赖层拷进 `<runtime>/loader`）。壳因此**不依赖**那个包——依赖方向是
+    // "devpackages → packages"，`@local/*` 不落到发布包的运行时依赖上。
+    loader: join(resourcesDir, "runtime", "loader", "register.mjs"),
   };
 }
 
@@ -258,16 +259,17 @@ function sourceLoaderEnvironment(path: string): Record<string, string> {
  * 所以壳自己的关键节点（启动、宿主就绪、fatal）落一份文件日志，与宿主那份（`${DSH_HOME}/logs/dev-host.log`，
  * 由 `@morlay/dsh-client-modules` 写）同目录，两边对着看就能定位"页面 → 壳 → 宿主"断在哪一段。
  */
-async function shellLog(text: string): Promise<void> {
+async function shellLog(message: string, ...args: readonly unknown[]): Promise<void> {
   const home = resolveDshHome(appConfig) ?? join(process.cwd(), ".dsh-store");
   const file = join(home, "logs", "shell.log");
   try {
     await mkdir(dirname(file), { recursive: true });
-    await appendFile(file, `${new Date().toISOString()} ${text}\n`, "utf8");
+    await appendFile(file, `${new Date().toISOString()} ${format(message, ...args)}\n`, "utf8");
   } catch {
     // 记不下来就算了：这里已在异常路径上，不该再抛。
   }
 }
+
 
 async function main(): Promise<void> {
   const development = developmentLayout();
@@ -297,9 +299,17 @@ async function main(): Promise<void> {
   if (development === undefined) {
     if (dataDir === undefined)
       throw new Error("dsh desktop: packaged applications require a concrete dataDir");
-    // 重种换的是**装配面**（清单 + 那份依赖归档）；依赖由 `ensureSeedProfile` 解压成实体闭包，
-    // 这里**不再**改写 profile 的清单、也不再跑一次 install。
-    await ensureSeedProfile(resources.seed, dataDir);
+    // **先完整种好 profile 再起宿主**：`ensureSeedProfile` 返回时，清单与依赖面（随包归档解压出来的
+    // 实体闭包）都已就位——它自己会校验"依赖面是否真的落地"，缺了就当场抛。"种了什么"也要看得见：
+    // 打包形态的 profile 出了问题（组件不完整之类）第一件事就是看这一行。随包没有那份种则是致命的：
+    // 那说明产物本身就缺件，不能带着空 profile 硬起。
+    const seeded = await ensureSeedProfile(resources.seed, dataDir);
+    if (seeded === "no-seed") {
+      throw new Error(
+        `dsh desktop: the packaged app carries no ${PROFILE_NAME} profile seed at ${resources.seed}`,
+      );
+    }
+    await shellLog(`profile 种子：${seeded === "seeded" ? "已重种" : "已是最新"}`);
   }
   // **两种形态都不要求上游的前端静态产物**：页面与资源由这条链（vite + 联邦预编译，见
   // `@morlay/dsh-client-modules`）在宿主进程里现场提供，壳只是把请求经字节管道交给它。所以这里不再检查
@@ -344,7 +354,7 @@ async function main(): Promise<void> {
   const handleHostFailure = (error: Error): void => {
     if (hostFailureHandled) return;
     hostFailureHandled = true;
-    console.error(`[dsh-shell] backend stopped: ${error.message}`);
+    void shellLog(`后端停止：${error.message}`);
     void shellLog(`宿主停止：${error.message}`);
     dialog.showErrorBox("dsh desktop backend stopped", error.message);
     quitConfirmed = true;
@@ -365,9 +375,14 @@ async function main(): Promise<void> {
       // 解析基准是**壳自己**：`@morlay/dsh-desktop-host` 是壳的依赖（打包后落在 `Resources/app/node_modules`
       // 里）。以前这里以**运行时根**为基准（`Resources/runtime/index.js`），能解析只是因为 runtime 里还留着一份
       // 重复的闭包——runtime 现在只放工具链（node / pnpm / loader），依赖面在壳与 profile 各自那一份里。
+      // 宿主入口：两种形态都从壳自己的解析面取（打包形态落在 `Resources/app/node_modules` 里，进 asar）。
+      // 宿主跑的就是 Electron 的 node（见上面 `node` 与 `ELECTRON_RUN_AS_NODE`），asar 补丁因此对它生效，
+      // 入口与其依赖树都能留在 asar 内——只有 native（`*.node`）必须 unpack 出来。
       entry: createRequire(import.meta.url).resolve(DESKTOP_HOST_PACKAGE),
 
       extraEnv: {
+        // 宿主进程的"node"是 Electron 二进制：这个开关让它当 node 用（上游 `node-environment.ts` 同款）。
+        ELECTRON_RUN_AS_NODE: "1",
         ...(dataDir === undefined ? {} : { DSH_HOME: dataDir }),
         // 宿主按它现场打包 preload（见 `@morlay/dsh-desktop-host/preload-source`）。
         ...(globalThis.__DSH_SHELL_ROOT__ === undefined
@@ -401,7 +416,7 @@ async function main(): Promise<void> {
     if (url.hostname !== "app") return new Response(null, { status: 404 });
     const active = host;
     if (active === undefined) return new Response("backend unavailable", { status: 503 });
-    if (!app.isPackaged) console.error(`[dsh-shell] recv ${request.method} ${url.pathname}`);
+    if (!app.isPackaged) void shellLog(`recv ${request.method} ${url.pathname}`);
     // **去掉条件请求头**：宿主的响应要包成 Fetch `Response`，而它不接受 304（`Invalid response status
     // code 304`）——vite 对源码模块正是回 304 的（`/@vite/client`、`/index.ts` 那些），于是每次刷新都在
     // 这里抛错。不带条件头，服务端就只会回 200（这条链的产物也不大，不值得为 304 冒这个险）。
@@ -414,8 +429,7 @@ async function main(): Promise<void> {
     });
     const response = await active.fetch(conditional);
     // dev 形态打印每个应用请求：排查「页面 → 壳 → 宿主」断在哪一段。
-    if (!app.isPackaged)
-      console.error(`[dsh-shell] ${request.method} ${url.pathname} → ${String(response.status)}`);
+    if (!app.isPackaged) void shellLog(`${request.method} ${url.pathname} → ${String(response.status)}`);
     return response;
   });
 
@@ -439,7 +453,7 @@ async function main(): Promise<void> {
     try {
       uplink.close();
     } catch (error) {
-      if (!app.isPackaged) console.error("[dsh-shell] stream uplink close failed", error);
+      if (!app.isPackaged) void shellLog("stream uplink close failed %o", error);
     }
   };
   ipcMain.handle(DESKTOP_IPC.streamOpen, async (event, endpoint: unknown, payload: unknown) => {
@@ -447,7 +461,7 @@ async function main(): Promise<void> {
     if (typeof endpoint !== "string") throw new Error("dsh desktop: stream endpoint must be text");
     const active = host;
     if (active === undefined) throw new Error("dsh desktop: Host is unavailable");
-    if (!app.isPackaged) console.error(`[dsh-shell] stream open ${endpoint}`);
+    if (!app.isPackaged) void shellLog(`stream open ${endpoint}`);
     const id = nextStreamId++;
     const abort = new AbortController();
     const stream: ActiveStream = { abort, uplink: undefined };
@@ -471,8 +485,7 @@ async function main(): Promise<void> {
     void (async () => {
       try {
         const response = await active.fetch(request);
-        if (!app.isPackaged)
-          console.error(`[dsh-shell] stream ${endpoint} → ${String(response.status)}`);
+        if (!app.isPackaged) void shellLog(`stream ${endpoint} → ${String(response.status)}`);
         event.sender.send(DESKTOP_IPC.streamChunk, { id, status: response.status });
         if (response.body === null) {
           event.sender.send(DESKTOP_IPC.streamEnd, { id });
@@ -510,7 +523,7 @@ async function main(): Promise<void> {
     try {
       uplink.enqueue(streamEncoder.encode(encodeDesktopStreamItem(item)));
     } catch (error) {
-      if (!app.isPackaged) console.error("[dsh-shell] stream uplink rejected", error);
+      if (!app.isPackaged) void shellLog("stream uplink rejected %o", error);
     }
   });
   ipcMain.on(DESKTOP_IPC.streamUplinkEnd, (event, id: unknown) => {
@@ -542,6 +555,9 @@ async function main(): Promise<void> {
 
   /** 宿主回环的 ws 端口：宿主起好之后填入（窗口重建时仍用它）。 */
   let desktopWsPort = 0;
+  // 窗口载入的地址：宿主 webServer 的 origin（`http://127.0.0.1:<port>`）。以前是自定义协议
+  // `dsh-custom-next://app/`——那条路没有 origin，settings 的 describe 流等长连接拿不到答复。
+  let hostOrigin = "";
   let appPreload = preloadPathOf();
   const createMainWindow = (): BrowserWindowType => {
     const window = createWindow(appPreload, appConfig.window, desktopWsPort);
@@ -564,7 +580,7 @@ async function main(): Promise<void> {
     const window = mainWindow;
     if (window === undefined || window.isDestroyed()) {
       const replacement = createMainWindow();
-      void replacement.loadURL(APPLICATION_URL);
+      void replacement.loadURL(hostOrigin);
       return;
     }
     if (window.isMinimized()) window.restore();
@@ -586,23 +602,23 @@ async function main(): Promise<void> {
   const started = await startHost();
   host = started.process;
   desktopWsPort = started.ready.wsPort;
+  hostOrigin = started.ready.origin;
   // preload 的字节由宿主机现场打包（sandboxed preload 只能 CJS，也挂不了 hooks）：取回来落到用户数据目录，
   // 再把路径交给窗口——装配目录里因此没有预产的 `dist/`。
   appPreload = preloadPathOf();
-  const preload = await started.process.fetch(
-    new Request(`${SCHEME}://app${PRELOAD_SOURCE_PATH}`),
-  );
+  // 直连宿主的真 webServer 取它（`installPreloadSource` 把这条路由注册在它上面）。以前走自定义协议 →
+  // 字节管道，而那条路已经不通向 webServer 了（页面改从 origin 载入之后，管道不再承载请求）。
+  const preload = await fetch(new Request(`${hostOrigin}${PRELOAD_SOURCE_PATH}`));
   if (!preload.ok) {
     throw new Error(
       `dsh desktop: preload bundling failed (${String(preload.status)}): ${await preload.text()}`,
     );
   }
   await writeFile(appPreload, await preload.text(), "utf8");
-  console.log(`[dsh-shell] 宿主就绪：wsPort=${String(desktopWsPort)} protocol=${String(started.ready.protocolVersion)}`);
-  await shellLog(`宿主就绪 wsPort=${String(desktopWsPort)}`);
+  await shellLog(`宿主就绪 wsPort=${String(desktopWsPort)} origin=${hostOrigin}`);
 
   mainWindow = createMainWindow();
-  await mainWindow.loadURL(APPLICATION_URL);
+  await mainWindow.loadURL(hostOrigin);
   if (development !== undefined && process.env.DSH_DESKTOP_OPEN_DEVTOOLS !== "0") {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
@@ -626,7 +642,7 @@ async function main(): Promise<void> {
     void active
       .stop()
       .catch((error: unknown) => {
-        console.error(error);
+        void shellLog("入口失败或收尾失败 %o", error);
       })
       .finally(() => {
         app.quit();
@@ -641,7 +657,7 @@ if (app.isPackaged) {
     await mkdir(profile, { recursive: true });
     app.setPath("userData", profile);
   } catch (error) {
-    console.error(error);
+    void shellLog("入口失败或收尾失败 %o", error);
   }
 }
 
@@ -662,7 +678,7 @@ if (ownsDesktopInstance)
     .then(main)
     .catch(async (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
-      console.error(error);
+      void shellLog("入口失败或收尾失败 %o", error);
       const diagnosticFile = process.env.DSH_DESKTOP_DIAGNOSTIC_FILE;
       if (diagnosticFile !== undefined) {
         await import("node:fs/promises")

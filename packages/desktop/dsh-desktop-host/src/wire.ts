@@ -94,6 +94,11 @@ export type DesktopHostEvent =
        * `WebSocket`。端口随机、只回环、不出本机。
        */
       readonly wsPort: number;
+      /**
+       * webServer 的 origin（`http://127.0.0.1:<port>`）：壳用它载入窗口。基于 URL/WS 的东西（settings 的
+       * describe 流、账号的 stream mux、vite 的 HMR）要求窗口来源就是它。
+       */
+      readonly origin: string;
     }
   | {
       readonly type: "fatal";

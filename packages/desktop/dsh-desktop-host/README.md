@@ -17,11 +17,12 @@
   ```
 
   `--profile-dir` 是 profile root（打包形态是种子种出的 `$DSH_HOME/profiles/<name>`，dev 形态是 app 目录本身）；
-- **入口只做三件事**：[`src/index.ts`](./src/index.ts) 解析参数 → 装配 → 接线；装配的唯一实现在
-  [`src/app-boot.ts`](./src/app-boot.ts)（desktop 与 web 共用，层完全由 profile 的 `dsh.profile.bundles`
-  决定），管道与请求分发在 [`src/desktop-ipc.ts`](./src/desktop-ipc.ts)，传输接管在 [`src/transport.ts`](./src/transport.ts)；
-- `--web`（dev 的 web 形态）走 [`src/web.ts`](./src/web.ts)：同一个 `app-boot`，只是 profile 名换成 `web`
-  并多一个端口契约，见[设计 dev 形态的 profile root 就是 app 目录](../../../devpackages/dshdev/.agents/designs/20261014-数据与工作目录的-layout.md)；
+- **入口只做三件事**：[`src/index.ts`](./src/index.ts) 解析参数 → 装配 → 接线；装配在
+  [`@morlay/dsh-app-boot`](../../boot/dsh-app-boot/README.md)（desktop 与 web 共用，层完全由 profile 的
+  `dsh.profile.bundles` 决定），管道与请求分发在 [`src/desktop-ipc.ts`](./src/desktop-ipc.ts)，传输接管在
+  [`src/transport.ts`](./src/transport.ts)；
+- `--web`（dev 的 web 形态）走 [`src/web.ts`](./src/web.ts)：同一个 `bootAppProfile`，只是 profile 名换成
+  `web` 并多一个端口契约，见[设计 dev 形态的 profile root 就是 app 目录](../../../devpackages/dshdev/.agents/designs/20261014-数据与工作目录的-layout.md)；
 - IPC：`ready { protocolVersion, wsPort }` / `fatal { message, diagnostic }`，另外收 `shutdown`。
 
 运行时做的事（profile 装配、`webServer` 替身、认证接管、客户端 transport 与账号面）、出口面与依赖边界见[设计 桌面host的运行时面与依赖边界](./.agents/designs/20260929-桌面host的运行时面与依赖边界.md)；载波形态的取舍见[设计 桌面无端口传输与窗口对齐](../../../devpackages/dshdev/.agents/designs/20260920-桌面无端口传输与窗口对齐.md)。

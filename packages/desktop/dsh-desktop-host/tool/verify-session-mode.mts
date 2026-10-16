@@ -27,18 +27,12 @@
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  loadLayeredEnv,
-  loadProfileDirectory,
-  reportSkippedBundles,
-} from "@deepseek-ai/dsh-app-boot";
-import { runProfile } from "@deepseek-ai/dsh/profile-boot";
+import { bootAppProfile } from "@morlay/dsh-app-boot";
 
 const PORT = 3098;
 const repoRoot = fileURLToPath(new URL("../../../..", import.meta.url));
 const store = join(repoRoot, "apps/dsh-custom-next/.dsh-store");
 const profileDir = join(store, "profiles", "web");
-const installAnchor = join(repoRoot, "vendor/deepseek-harness/apps/cli/package.json");
 
 // 部署里应当存在的那两个模式。
 const EXPECTED_MODES: readonly string[] = ["coding", "chat"];
@@ -58,18 +52,9 @@ if (!profileReady) {
 
 process.env.DSH_HOME = store;
 
-// 加载跳过原因由启动方上报。
-const profile = loadProfileDirectory("dsh", profileDir, installAnchor);
-reportSkippedBundles("dsh", profile);
-
-const { ctx, shutdown } = await runProfile({
-  environment: loadLayeredEnv("dsh"),
+const { ctx, shutdown } = await bootAppProfile({
+  profileDir,
   profile: "web",
-  resolvedProfile: {
-    profile,
-    installAnchor,
-  },
-  patchFiles: [],
   args: ["--no-open", "--port", String(PORT)],
 });
 

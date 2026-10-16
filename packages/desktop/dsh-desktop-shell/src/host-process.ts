@@ -53,6 +53,8 @@ export interface DesktopHostReady {
   readonly protocolVersion: number;
   /** 宿主进程内回环的 ws 端口（页面把 `ws://app/…` 重写到这里，见 `@morlay/dsh-desktop-host/ws-bridge`）。 */
   readonly wsPort: number;
+  /** 宿主 webServer 的 origin（`http://127.0.0.1:<port>`）：窗口就是载入它。 */
+  readonly origin: string;
 }
 
 // 后端调试端点的状态：`url` 为空表示没开（被关掉或开不起来，原因在 `message`）。
@@ -227,7 +229,11 @@ export class DesktopHostProcess {
         for (const listener of this.inspectedListeners) listener(message);
         return;
       }
-      this.readyResolve({ protocolVersion: message.protocolVersion, wsPort: message.wsPort });
+      this.readyResolve({
+        protocolVersion: message.protocolVersion,
+        wsPort: message.wsPort,
+        origin: message.origin,
+      });
     });
     child.once("error", (error) => {
       this.fail(error);
@@ -534,6 +540,7 @@ export class DesktopHostProcess {
       try {
         this.options.onFailure?.(error);
       } catch (listenerError) {
+// 监听器自己抛错：这条通道可能已经坏了，记不了就只留一行 stderr。
         console.error(listenerError);
       }
     }

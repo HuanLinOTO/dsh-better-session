@@ -1,6 +1,6 @@
 // dev 形态的 web 启动入口（不进包的 `files`：只有 `dev --web` 用它）。
 //
-// 它做的事只有一件：把 **profile root 当 profile 启一次 web 形态**——装配走 `app-boot`，与桌面
+// 它做的事只有一件：把 **profile root 当 profile 启一次 web 形态**——装配走 `@morlay/dsh-app-boot`，与桌面
 // 宿主同一份；`@deepseek-ai/dsh-web-app` 那套行（端口、认证、打印 URL、开浏览器）由 profile 的
 // bundle 层提供，和上游 `dsh --profile web` 完全同一套。
 //
@@ -8,7 +8,7 @@
 // [--patch <file>]... [-- <web app 的内层参数>...]`；端口契约与上游一致：`PORT` 环境变量定缺省
 // （3080），内层里显式 `--port` 以它为准，`--no-open` 等 flag 原样交给 web app 的 flag family。
 
-import { bootAppProfile } from "./app-boot.ts";
+import { bootAppProfile } from "@morlay/dsh-app-boot";
 import { parseHostInvocation } from "./invocation.ts";
 
 /** 与上游 `dsh --profile web` 相同的缺省端口。 */
@@ -28,19 +28,24 @@ export function webArgs(inner: readonly string[], port: string): readonly string
 async function main(): Promise<void> {
   const invocation = parseHostInvocation("dsh web", process.argv.slice(2));
   const port = process.env.PORT ?? DEFAULT_WEB_PORT;
-  console.error(
-    `[dsh-web] profile root=${invocation.profileDir} runtime=${invocation.runtimeDir} port=${port}`,
-  );
-  await bootAppProfile({
+  const { ctx } = await bootAppProfile({
     profileDir: invocation.profileDir,
     profile: "web",
     patchFiles: invocation.patches,
     args: webArgs(invocation.inner, port),
   });
+  // 这行在**树起来之后**打：名字交给这条树的 logger（不自己拼 `[dsh-web]` 前缀），exporter 拿到的是字段。
+  ctx.logger.info(
+    "profile root=%s runtime=%s port=%s",
+    invocation.profileDir,
+    invocation.runtimeDir,
+    port,
+  );
 }
 
 if (import.meta.main) {
   main().catch((error: unknown) => {
+    // 树没起来（或已经在拆）时只能用 console：这里没有 `ctx.logger` 可用。
     console.error(error);
     process.exitCode = 1;
   });
