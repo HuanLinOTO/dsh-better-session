@@ -15,10 +15,8 @@ Harness 的 profile，提供**就地编辑 / 重试 / 撤回 / 分支**（rewind
 dsh plugin --profile web add "@morlay/better-session"
 ```
 
-安装带上全部子包，bundle patch（[`cordis.patch.yml`](./cordis.patch.yml)）自动装配四层服务，并把官方
-`session-persistence-jsonl` / `storage-json` / `session-projection-cache` / `session-query-sqlite` 那几行换掉
-（对话 UI 行不动）。装了什么、为什么这么换、边界在哪，见
-[设计 会话编辑闭环装配](./.agents/designs/20260917-会话编辑闭环装配.md)与
+安装带上全部子包，bundle patch（[`cordis.patch.yml`](./cordis.patch.yml)）自动装配四层服务。装了什么、为什么这么
+换、边界在哪，见[设计 会话编辑闭环装配](./.agents/designs/20260917-会话编辑闭环装配.md)与
 [ADR 不 fork 上游前端组件](../../../.agents/adrs/20261001-不fork上游前端组件只做插槽扩展.md)。
 
 ## 使用
@@ -41,16 +39,6 @@ await ctx.sessionBranch.forkFrom(sourceId, { atSeq: 6, childSessionId });
 
 ## 配置（rdb）
 
-默认配置为 SQLite（`$DSH_HOME/sessions/sessions.sqlite`）。改配置就是改这一行的 config（bundle patch / profile
-patch / 设置页都可）：
-
-```yaml
-- id: session-rdb
-  name: "@morlay/session-rdb"
-  config:
-    type: sqlite # 或 postgres + connectionString
-    path: /abs/path/to/sessions.sqlite
-```
-
-上游 settings 只投影 volatile 字段做表单编辑，改动持久化回 entry config，不再覆盖插件 config，见
-[ADR-跟随上游session-format](../../session/session-rdb/.agents/adrs/20260917-跟随上游session-format.md)。
+默认配置为 SQLite（`$DSH_HOME/sessions/sessions.sqlite`）。改配置就是改 `session-rdb` 那一行的 config（bundle patch /
+profile patch / 设置页都可）——字段、默认值与生效方式见
+[`@morlay/session-rdb` 的 README](../../session/session-rdb/README.md)。

@@ -1,10 +1,9 @@
 # @morlay/dsh-tool-guidance
 
 本部署的**工具说明运行时**：包根本身把工具描述换成一行中文、剥掉 schema 里的说明性字段，并把用法按组
-送达——`base` 组的正文由本行挂 `agent/pre-step` 常驻注入（按**这个会话装配结果里最终可见的工具目录**过滤），
-按需的 `flow` / `delegation` / `team` 三组注册进官方 `ctx.skills`（目录与按需加载由官方 `tool-skill` 那一行
-提供）；`rows` 出口只发布 **它那一行**（`tool-guidance`，host 平面）。取舍见
-[设计-工具说明与用法分组的送达](.agents/designs/20260929-工具说明与用法分组的送达.md)。
+送达——`base` 组常驻注入，`flow` / `delegation` / `team` 三组注册进官方 `ctx.skills` 按需加载（目录由官方
+`tool-skill` 那一行提供）；`rows` 出口只发布 **它那一行**（`tool-guidance`，host 平面）。形态、接缝与代价见
+[设计 工具说明与用法分组的送达](./.agents/designs/20260929-工具说明与用法分组的送达.md)。
 
 功能行清单（工具 / 命令 / 压缩 / 计划模式 / 委派）**不归本包**：它们住在会话挂着的 agent preset 里（官方 shipped
 preset 或部署自建的那份）。取舍见
@@ -23,11 +22,7 @@ preset 或部署自建的那份）。取舍见
 装配层把 `tool-guidance` 插在 **host 平面**（`toolGuidanceRow()` 给出行 id 与模块名），装的就是本包的包根
 （`@morlay/dsh-tool-guidance`）。`rows` 出口只有数据，没有装配动作。
 
-那一行只有一个开关 `config.groups`（部署级，默认开）：关掉它只剩工具预处理（短描述汉化 + schema 精简），
-`base` 常驻注入与按需三组一起不发生——它们是一件事的两半。
-
-模式的 `allowTools` 留空即"不设收窄，用 preset 的全部工具"；要收窄就列名单（见
-[dsh-session-mode](../dsh-session-mode/README.md)）。
+那一行只有一个开关 `config.groups`（部署级，默认开）：关掉它只剩工具预处理（短描述汉化 + schema 精简）。
 
 ## 边界
 

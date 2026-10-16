@@ -15,19 +15,16 @@ provider 面），并接管 `ctx.sessionQuery`（全文检索 disabled）与 `$D
   name: "@morlay/session-rdb"
   config:
     type: sqlite
-    # 省略 path 时回落 bundle patch 的默认（$DSH_HOME/sessions/sessions.sqlite，由 patch 的 !!js 表达式求值）；
-    # 自定义路径请用绝对路径字符串。
-    path: /absolute/path/to/sessions.sqlite
+    path: /absolute/path/to/sessions.sqlite # 自定义路径请用绝对路径；省略则由 bundle patch 的默认值兜底
     journalMode: wal
     busyTimeout: 5000
 ```
 
-PostgreSQL 同理：`type: postgres` + `connectionString`（可加 `schema`，默认 `public`）。改配置由 Loader 重挂
-这一行生效（换后端 = 换库，旧数据留在旧后端）；字段、默认值与设置页行为见
-[设计总览](.agents/designs/20260917-设计总览.md) 的「配置门面」。
+PostgreSQL 同理：`type: postgres` + `connectionString`（可加 `schema`，默认 `public`）。字段、默认值、装配默认值的
+来源与「改配置由 Loader 重挂这一行生效」见[设计总览](./.agents/designs/20260917-设计总览.md)的「配置门面」。
 
 管理面的 HTTP 通道统一挂在 `/api/morlay/v1/session` 前缀下（均为 `POST`，body `{ sessionId }` 或列表请求
 `{ query?, includeSubagents?, page?, pageSize? }`）：`/rows`（完整语料，含归档）、`/export`、`/import`、
 `/delete`、`/gc`、`/usage`（前缀与上游分家的理由见
-[ADR-管理面HTTP路由前缀与上游分家](.agents/adrs/20260929-管理面HTTP路由前缀与上游分家.md)）。旧
+[ADR-管理面HTTP路由前缀与上游分家](./.agents/adrs/20260929-管理面HTTP路由前缀与上游分家.md)）。旧
 `$DSH_HOME/storages` JSON 的导入是包内 API `importStorages`（`src/import-storages.ts`，不在包出口里）。

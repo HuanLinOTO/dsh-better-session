@@ -2,10 +2,10 @@
 
 DeepSeek Harness 的 **OpenAI 兼容 LLM 适配器**：`providers` 是 dict 多路由（**key 就是 provider 路由键**），每个
 profile 除了端点与模型目录，还能声明 **profile 级默认采样参数**（`temperature` / `topP` / `topK` /
-`presencePenalty` / `frequencyPenalty` / `seed`）——请求级 `GenerateOptions.temperature` 优先于 profile 默认，缺省
-一律不发送（= 提供方默认）。传输层复用
+`presencePenalty` / `frequencyPenalty` / `seed`）。传输层复用
 **[@ai-sdk/openai-compatible](https://www.npmjs.com/package/@ai-sdk/openai-compatible)**，本插件只做 harness
-适配：消息 → AI SDK prompt、采样合并、stream part → `StreamChunk`、错误归一化与凭据策略。
+适配：消息 → AI SDK prompt、采样合并、stream part → `StreamChunk`、错误归一化与凭据策略。合并规则与省略语义见
+[ADR 采样默认值合并规则与省略语义](./.agents/adrs/20260917-采样默认值合并规则与省略语义.md)。
 
 **与官方 `llm-pi-ai` 二选一**：两者都提供 openai-compatible 的 `providers` dict 与同名 provider 路由，同装会有
 两套适配器抢同一批路由，一个部署只装一个。本部署装的是官方那行——它的 `ollama` route 由
@@ -37,6 +37,7 @@ profile 除了端点与模型目录，还能声明 **profile 级默认采样参�
             reasoningEfforts: { off: null, high: high, max: max }
 ```
 
-`providers` 标了 `.volatile()`——**运行期可改**：值经 Loader 的引用读取，设置页（Models 页）改的就是它，不需要
-重挂这行插件。字段清单（端点与请求头、采样、模型目录、传输与重试）、wire 落点与省略语义、错误映射、凭据与图片
-策略都在各自 ADR 里；`$DSH_HOME/settings.yaml` 里同名的段由上游在启动时导入同 id 的行 config。
+`providers` 标了 `.volatile()`——运行期可改，不需要重挂这行插件（见
+[ADR 运行期改配置走 volatile 引用](./.agents/adrs/20260922-运行期改配置走volatile引用.md)）。字段清单（端点与
+请求头、采样、模型目录、传输与重试）、wire 落点与省略语义、错误映射、凭据与图片策略都在各自 ADR 里；
+`$DSH_HOME/settings.yaml` 里同名的段由上游在启动时导入同 id 的行 config。

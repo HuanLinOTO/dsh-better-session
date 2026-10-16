@@ -1,13 +1,12 @@
 # @morlay/dsh-client-ui-primitives
 
-对话 UI 与设置页共用的**基础面**：**上游那套样式**（每件组件一个 `*.module.css`，token 直接写
-`var(--dsw-*)`，与官方 `ui-primitives` 同一套技术栈）、**官方基础组件的统一出口**（`Button` / `Menu` / `Input` /
-`Tag` / `Modal` / `Switch` / `SettingsForm` / 图标 … 由本包 `export *` 转出，业务包只向本包取控件）、**布局原语**
-（`Stack` / `Row` / `Text`，间距 / 内距 / 文本档位集中在 `layout` 的档位表里）、**这套界面自有的控件**（字段行
-`SettingsFieldRow`、可搜索选择器 `SearchSelect`、模型路由清单 `ModelRouteList`、标签输入 `TagInput`、多行文本
-`MultilineField`、图标按钮 `IconButton`、按钮 `Button`、`Spinner` / `Bubble` / `PopoverPanel` …）、
-**按 schema 自动生成的行配置页**，以及**引用解析与渲染转换**（host 与 client 共用唯一一份源码，
-[`@morlay/dsh-reference`](../../context/dsh-reference/README.md) 的引用展开复用 host 那半）。
+对话 UI 与设置页共用的**基础面**：上游那套样式、官方基础组件的统一出口（`Button` / `Menu` / `Input` / `Modal` /
+`Switch` / `SettingsForm` / 图标 …）、布局原语（`Stack` / `Row` / `Text`）、这套界面自有的控件（字段行 / 可搜索
+选择器 / 标签输入 / 图标按钮 …）、按 schema 自动生成的行配置页，以及引用解析与渲染（host 与 client 共用唯一一份
+源码，[`@morlay/dsh-reference`](../../context/dsh-reference/README.md) 的引用展开复用 host 那半）。
+
+样式与控件的写法约束见[规范 how-to-write](./.agents/standards/how-to-write.md)；schema 表单、字段槽与装配形态的
+机制见[设计 按 schema 自动生成行配置表单与字段槽注入](./.agents/designs/20260924-schema自动生成行配置表单与字段槽注入.md)。
 
 ## 用法
 
@@ -25,7 +24,7 @@ export const Config = z.object({
 ```
 
 ```tsx
-// 想给某个字段换控件或只改文案：注册 chain 槽（select 返回 null 才是不认领）
+// 想给某个字段换控件或只改文案：注册 chain 槽
 import {
   SchemaFieldDefault,
   type SchemaFieldComponentProps,
@@ -44,7 +43,7 @@ ctx.slots.inject("settings.schema-form.field", () =>
 );
 ```
 
-设置表单原语是暂存式的：控件只上报用户输入，`save` 是唯一写盘点。
+设置表单原语：
 
 ```ts
 import { SettingsFormModel, settingsNumberField } from "@morlay/dsh-client-ui-primitives/client";
@@ -52,8 +51,7 @@ import { SettingsFormModel, settingsNumberField } from "@morlay/dsh-client-ui-pr
 const form = new SettingsFormModel(scope, [settingsNumberField("timeoutMs")]);
 ```
 
-业务页面组设置面时，控件与字段摆位都从这里取（**业务层不写控件外观**；每个控件带稳定的 `data-role` 供样式、测试与
-自动化定位）：
+业务页面组设置面时，控件与字段摆位都从这里取：
 
 ```tsx
 import {
@@ -74,7 +72,5 @@ import {
 </SettingsFieldRow>;
 ```
 
-装配：**不是装配行**——client 半随用到它的 client 行内联（清单里标 `dsh.client.inline`，devkit 因此不把它当
-模块表里的行外置），装配入口 `apply` 由那些行各自调用、按服务在场与否幂等去重；样式由构建期内联成
-"模块执行即注入 `<style>`"，同名 `<style data-plugin-css>` 只注入一份。
-取舍见 [ADR 基础面暂时内联而不是装配行](./.agents/adrs/20261001-暂时内联而不是装配行.md)。
+装配：**不是装配行**——client 半随用到它的 client 行内联，`apply` 由那些行各自调用、幂等去重。取舍见
+[ADR 基础面暂时内联而不是装配行](./.agents/adrs/20261001-暂时内联而不是装配行.md)。
