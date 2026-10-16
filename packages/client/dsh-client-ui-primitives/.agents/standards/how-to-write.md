@@ -32,3 +32,16 @@
   `multiline-field` / `model-route-list` / `field-row` …——它是"这是个什么控件"的身份，供样式、测试与自动化定位。
   - 判据：控件能被统一地找到，不靠 class 名或 DOM 层级。
   - 反例：业务自己的标记占用 `data-role`（"哪个角色"这种业务语义另起专名，如 `data-mode-role`）。
+
+## 包面与 client 半（三条容易踩的）
+
+- **`dsh.client.inject` 与 client 半的 `inject` 是两码事**：前者写**包名**（模块到达顺序），后者写 **cordis 服务名**
+  （`locale` / `slots` 这类）。把包名抄进后者会让那一行永远 pending——症状是 `web boot: 1 entry did not activate`，
+  页面只剩 `Failed to load plugins`。
+- **client 半的运行时依赖走平台种子**：React 与 `@deepseek-ai/dsh-client-store` 在 client bundle 里是 external，
+  由平台的 baseline 提供（见 `devpackages/devkit` 的 `BASELINE`）；本包按上游同名包的位置把 `dsh-client-store`
+  声明在 `devDependencies`，别挪进 `dependencies`。
+- **照抄上游的 token 引用**：官方那张卡的 hover 底色引用 `--dsw-alias-bg-layer-4`、失败文案引用
+  `--dsw-alias-label-error`，两个都**不在**官方主题的定义集里（`theme.generated.ts` 里没有它们）。照抄引用、
+  不换近义 token、也不加 fallback——官方主题哪天定义它们，这里自动跟着生效、视觉与上游逐帧一致。
+
