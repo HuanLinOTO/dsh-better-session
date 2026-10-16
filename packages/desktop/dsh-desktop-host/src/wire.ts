@@ -106,8 +106,7 @@ export type DesktopHostEvent =
       // 当前可用的调试端点；为 null 表示没开（被关掉或开不起来，原因在 `message`）。
       readonly url: string | null;
       readonly message?: string;
-    }
-  ;
+    };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

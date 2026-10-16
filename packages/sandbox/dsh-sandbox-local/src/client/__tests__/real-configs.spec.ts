@@ -50,7 +50,12 @@ function linesOf(schema: unknown, value: unknown): schemaForm.EditorLine[] {
     addable,
     invalidAt: new Map(),
   } as unknown as schemaForm.SchemaFormState;
-  return schemaForm.editorLines(state, { collapsed: () => false, toggle: () => {} }, resolveText, t);
+  return schemaForm.editorLines(
+    state,
+    { collapsed: () => false, toggle: () => {} },
+    resolveText,
+    t,
+  );
 }
 
 // 某一层的闭合行上的可添加项。

@@ -5,12 +5,12 @@
 
 ## 判据：谁在读
 
-| 读者 | 读法 | 能不能读 asar |
-| --- | --- | --- |
-| **Electron 主进程**（壳自己的代码与它 `require` 的包） | `require` / `fs`，走 Electron 的 asar 补丁 | **能**（asar 内是透明路径） |
-| **宿主的 node 子进程**（`@morlay/dsh-desktop-host` 及其依赖） | 独立进程，`import` 真文件 | **能——只要它自己也是 Electron 二进制**（`ELECTRON_RUN_AS_NODE=1` 下 asar 补丁照样注入） |
-| **外部命令**（`tar` 解压、`node pnpm.mjs`、`spawn` 出来的 shell 工具） | 系统可执行文件 | **不能**（asar 内不是真文件） |
-| native 模块（`*.node`，`dlopen`） | 需要真文件 | **不能** → 必须 `asarUnpack` |
+| 读者                                                                   | 读法                                       | 能不能读 asar                                                                           |
+| ---------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------- |
+| **Electron 主进程**（壳自己的代码与它 `require` 的包）                 | `require` / `fs`，走 Electron 的 asar 补丁 | **能**（asar 内是透明路径）                                                             |
+| **宿主的 node 子进程**（`@morlay/dsh-desktop-host` 及其依赖）          | 独立进程，`import` 真文件                  | **能——只要它自己也是 Electron 二进制**（`ELECTRON_RUN_AS_NODE=1` 下 asar 补丁照样注入） |
+| **外部命令**（`tar` 解压、`node pnpm.mjs`、`spawn` 出来的 shell 工具） | 系统可执行文件                             | **不能**（asar 内不是真文件）                                                           |
+| native 模块（`*.node`，`dlopen`）                                      | 需要真文件                                 | **不能** → 必须 `asarUnpack`                                                            |
 
 上游就是这么切的（`vendor/deepseek-harness/apps/desktop/src/main.ts:154`、`node-environment.ts:15`、
 `host-process.ts:188`）：**宿主用 Electron 二进制当 node**（`const node = process.execPath` + `ELECTRON_RUN_AS_NODE=1`），
@@ -48,12 +48,12 @@ Contents/Resources/
 
 实测（`dshdev desktop bundle --dir`，同一个 app）：
 
-| 项 | 改动前 | 改动后 |
-| --- | --- | --- |
-| `Resources/app/node_modules` 文件数 | 15087 | **0**（整块进 `app.asar`，111 MB） |
-| `app.asar.unpacked` | — | 758 个文件（其中 6 个 `*.node`） |
-| 整个 .app 的文件数 | ~15800 | **1724** |
-| 体积 | 1.2 G | 1.2 G（asar 不压缩；省的是**文件数**，也就是 Electron 冷启动要读的小文件） |
+| 项                                  | 改动前 | 改动后                                                                     |
+| ----------------------------------- | ------ | -------------------------------------------------------------------------- |
+| `Resources/app/node_modules` 文件数 | 15087  | **0**（整块进 `app.asar`，111 MB）                                         |
+| `app.asar.unpacked`                 | —      | 758 个文件（其中 6 个 `*.node`）                                           |
+| 整个 .app 的文件数                  | ~15800 | **1724**                                                                   |
+| 体积                                | 1.2 G  | 1.2 G（asar 不压缩；省的是**文件数**，也就是 Electron 冷启动要读的小文件） |
 
 决定性验证（不需要 GUI）：`ELECTRON_RUN_AS_NODE=1 <app>/Contents/MacOS/<app> -e "readFileSync('<Resources>/app.asar/node_modules/@morlay/dsh-desktop-host/src/index.ts')"`
 → 读到 5860 字节，正是宿主的入口源码。
@@ -64,10 +64,10 @@ Contents/Resources/
 （它平时装包就是硬链，秒级）。实测（`pnpm fetch --prod --store-dir /tmp/store-probe`，用的是 deploy 的
 lockfile）：
 
-| | 现状（tar） | store 方案 |
-| --- | --- | --- |
-| 体积 | 465 MB | **1.5 GB** |
-| 文件数 | 105171 | 91364 |
+|        | 现状（tar） | store 方案 |
+| ------ | ----------- | ---------- |
+| 体积   | 465 MB      | **1.5 GB** |
+| 文件数 | 105171      | 91364      |
 
 store 是内容寻址、已经去过重的，仍旧 1.5 G / 9.1 万文件。而首启的耗时是**写文件**（同一个 tar 实测
 `real 56.4s / user 4.9s / sys 49.1s`——CPU 只花 5 秒，49 秒在内核写元数据），文件数只少 13% 等于几乎不提速，
@@ -81,11 +81,11 @@ store 是内容寻址、已经去过重的，仍旧 1.5 G / 9.1 万文件。而�
 
 闭包要落在 `Resources/profile`，但这三件事都不通：
 
-| 试过的 | 结果 |
-| --- | --- |
-| `extraResources: { from: <deploy>, to: "profile" }` | 目录建了、非 `node_modules` 的文件也拷了，**唯独 `node_modules` 是空的**——electron-builder 的默认忽略规则含 `**/node_modules/**`，显式 `filter: ["**/*"]` 覆盖不掉 |
-| `pnpm deploy --node-linker=hoisted` | `ERR_PNPM_CANNOT_DEPLOY`：hoisted 会解析依赖的真实路径，而 lockfile 里有指向 workspace 之外的 `file:` 依赖（在 `vendor` 那份工作区里），pnpm 判定"不安全路径"拒绝 |
-| `afterPack` 里用 `context.packager.projectDir` 当工作区根 | 那是壳的装配目录（`.dshdev/shell`），`pnpm deploy` 在那里写过 `pnpm-workspace.yaml`，于是它被当成工作区根 → 同样报"路径在工作区之外" |
+| 试过的                                                    | 结果                                                                                                                                                               |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `extraResources: { from: <deploy>, to: "profile" }`       | 目录建了、非 `node_modules` 的文件也拷了，**唯独 `node_modules` 是空的**——electron-builder 的默认忽略规则含 `**/node_modules/**`，显式 `filter: ["**/*"]` 覆盖不掉 |
+| `pnpm deploy --node-linker=hoisted`                       | `ERR_PNPM_CANNOT_DEPLOY`：hoisted 会解析依赖的真实路径，而 lockfile 里有指向 workspace 之外的 `file:` 依赖（在 `vendor` 那份工作区里），pnpm 判定"不安全路径"拒绝  |
+| `afterPack` 里用 `context.packager.projectDir` 当工作区根 | 那是壳的装配目录（`.dshdev/shell`），`pnpm deploy` 在那里写过 `pnpm-workspace.yaml`，于是它被当成工作区根 → 同样报"路径在工作区之外"                               |
 
 **落定的做法**：`afterPack` 里调 **`deployClosure(appWorkspace, name, <Resources>/profile)`** ——
 `appWorkspace` 是**真的 app 目录**（由 `buildDesktopConfig` 的入参传进来，不能用打包器的 projectDir）；

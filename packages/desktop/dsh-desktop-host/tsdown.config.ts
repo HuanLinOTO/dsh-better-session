@@ -13,10 +13,12 @@ export default defineConfig({
     // 桌面 overlay 用相对路径加载的行（patch 只认路径，不认包出口）。
     "settings-namespace": "./src/settings-namespace.ts",
   },
-  plugins: [cordisPlugin({
-  // 产物落 `.js` 而不是 `.mjs`/`.cjs`：壳与工具按 node 解析读这里的子出口；
-  // 这样的**路径**加载它们（patch 行只认路径，不认包出口）。
-  fixedExtension: false,
-  dts: false,
-  })],
+  plugins: [
+    cordisPlugin({
+      // 产物落 `.js` 而不是 `.mjs`/`.cjs`：壳与工具按 node 解析读这里的子出口；
+      // 这样的**路径**加载它们（patch 行只认路径，不认包出口）。
+      fixedExtension: false,
+      dts: false,
+    }),
+  ],
 });

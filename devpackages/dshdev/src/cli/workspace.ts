@@ -255,8 +255,7 @@ export function mergedDeploySettings(source: string, destination: string): strin
 
 export async function packageVersion(path: string, subject: string): Promise<string> {
   const manifest = JSON.parse(await readFile(path, "utf8")) as { version?: string };
-  if (typeof manifest.version !== "string")
-    throw new Error(`dshdev: ${subject} has no version`);
+  if (typeof manifest.version !== "string") throw new Error(`dshdev: ${subject} has no version`);
   return manifest.version;
 }
 

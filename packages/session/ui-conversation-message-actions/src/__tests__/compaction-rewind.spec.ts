@@ -2,11 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Context } from "@deepseek-ai/cordis";
 import { Session, SessionSeq, type SessionEvent } from "@deepseek-ai/dsh-session";
 import SessionPersistenceSqlite from "@morlay/session-rdb";
-import {
-  closedTurns,
-  editableMessages,
-  retryableTurns,
-} from "../plan.ts";
+import { closedTurns, editableMessages, retryableTurns } from "../plan.ts";
 import {
   assistantMessage,
   createPersisted,

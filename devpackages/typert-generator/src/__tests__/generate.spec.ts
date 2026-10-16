@@ -115,7 +115,9 @@ describe("typert 产物生成", () => {
     // stream 方法的 mode 与声明面签名
     expect(remote).toContain("mode: 'stream'");
     expect(remote).toContain("watch: (signal?: AbortSignal) => RemoteStreamHandle<boolean, never>");
-    expect(remote).toContain("read: (payload: Payload, options?: Options, signal?: AbortSignal) => Promise<RemoteResult<Payload>>");
+    expect(remote).toContain(
+      "read: (payload: Payload, options?: Options, signal?: AbortSignal) => Promise<RemoteResult<Payload>>",
+    );
     // declare module 三段齐（少了 NamespaceMap，client 半的类型会整片解析不到）
     expect(remote).toContain("interface TypertRemoteNamespace$");
     expect(remote).toContain("interface TypertRemoteNamespaceMap {");

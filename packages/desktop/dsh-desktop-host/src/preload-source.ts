@@ -80,8 +80,7 @@ export function installPreloadSource(ctx: Context, options: PreloadSourceOptions
     })();
   };
   ctx.effect(
-    () =>
-      ctx.webServer.register({ kind: "exact", path: PRELOAD_SOURCE_PATH, handler: serve }),
+    () => ctx.webServer.register({ kind: "exact", path: PRELOAD_SOURCE_PATH, handler: serve }),
     `dsh-desktop-host: ${PRELOAD_SOURCE_PATH}`,
   );
 }

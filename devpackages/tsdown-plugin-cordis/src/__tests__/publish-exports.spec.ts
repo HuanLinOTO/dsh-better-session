@@ -60,8 +60,10 @@ describe("发布态的包出口", () => {
       if (dev !== "./src/client/index.ts") wrong.push(`${name}: dev=${String(dev)}`);
       // 发布态：`import`/`default` 指 **ESM 库**（CJS 工厂不进 exports，它是模块表的注册脚本），
       // `types` 指 ESM 面的声明。
-      if (published?.import !== "./dist/client.mjs") wrong.push(`${name}: import=${String(published?.import)}`);
-      if (published?.types !== "./dist/client.d.mts") wrong.push(`${name}: types=${String(published?.types)}`);
+      if (published?.import !== "./dist/client.mjs")
+        wrong.push(`${name}: import=${String(published?.import)}`);
+      if (published?.types !== "./dist/client.d.mts")
+        wrong.push(`${name}: types=${String(published?.types)}`);
     }
     expect(wrong).toEqual([]);
   });

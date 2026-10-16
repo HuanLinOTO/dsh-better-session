@@ -7,8 +7,18 @@
 // 用法见 [`README.md`](../README.md)，设计见
 // [`自研 app-boot`](../.agents/designs/20261015-自研-app-boot（切开-dsh-依赖）.md)。
 
-export { bootAppProfile, installAnchorOf, type AppProfileBoot, type AppProfileOptions } from "./app-profile.ts";
-export { PROFILE_ROOT_FILENAME, runProfile, type ResolvedProfile, type RunProfileOptions } from "./profile-boot.ts";
+export {
+  bootAppProfile,
+  installAnchorOf,
+  type AppProfileBoot,
+  type AppProfileOptions,
+} from "./app-profile.ts";
+export {
+  PROFILE_ROOT_FILENAME,
+  runProfile,
+  type ResolvedProfile,
+  type RunProfileOptions,
+} from "./profile-boot.ts";
 export {
   PROCESS_SHUTDOWN_TIMEOUT_MS,
   createProcessShutdown,

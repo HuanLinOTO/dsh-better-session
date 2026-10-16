@@ -6,13 +6,18 @@ import { Stagehand, localBrowser } from "@browserbasehq/stagehand";
 
 const target = process.argv[2] ?? "http://127.0.0.1:3081/";
 
-const browser = await localBrowser.launch({ headless: true, args: ["--no-sandbox", "--disable-gpu"] });
+const browser = await localBrowser.launch({
+  headless: true,
+  args: ["--no-sandbox", "--disable-gpu"],
+});
 const stagehand = await Stagehand.create({ browser });
 const [page] = await browser.context.pages();
 
 await page.addInitScript(() => {
   globalThis.__PROBE_ERRORS__ = [];
-  addEventListener("error", (event) => globalThis.__PROBE_ERRORS__.push(String(event.message).slice(0, 140)));
+  addEventListener("error", (event) =>
+    globalThis.__PROBE_ERRORS__.push(String(event.message).slice(0, 140)),
+  );
   addEventListener("unhandledrejection", (event) =>
     globalThis.__PROBE_ERRORS__.push(`rejection ${String(event.reason).slice(0, 120)}`),
   );
@@ -31,7 +36,9 @@ console.log("[页面]", JSON.stringify({ root: state.root, ctx: state.ctx, text:
 const rows = consoleLines.filter((line) => line.startsWith("[dsh] plugin "));
 console.log("[行数]", rows.length);
 for (const line of rows) console.log("  ", line.replace(/^\[dsh\] plugin \d+ /, ""));
-const others = consoleLines.filter((line) => line.startsWith("[dsh]") && !line.startsWith("[dsh] plugin "));
+const others = consoleLines.filter(
+  (line) => line.startsWith("[dsh]") && !line.startsWith("[dsh] plugin "),
+);
 console.log("[入口其它]", others.slice(0, 6));
 console.log("[页面错误]", state.errors.length, [...new Set(state.errors)].slice(0, 6));
 

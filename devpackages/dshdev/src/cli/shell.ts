@@ -46,28 +46,21 @@ export async function prepareShell(workRoot: string): Promise<AssembledShell> {
   const root = join(workRoot, "shell");
   await rm(root, { recursive: true, force: true });
   await mkdir(root, { recursive: true });
-  log.info("shell %o", { "dir": root, "package": "@morlay/dsh-desktop-shell" });
+  log.info("shell %o", { dir: root, package: "@morlay/dsh-desktop-shell" });
 
   // 壳这一单元的依赖：**交给 `pnpm deploy`**（扁平解析面，事后由 `linkClosureTopLevel` 挂平），而不是
   // 手写链接或逐个挑包。它要什么由壳包自己的清单说了算（与壳构建时内联的同一份名单）。
   // `pnpm --filter` 要在**工作区根**跑（那里才有 `pnpm-workspace.yaml`）。
   await runPnpm(
-    [
-      "--filter",
-      "@morlay/dsh-desktop-shell",
-      "deploy",
-      "--prod",
-      "--ignore-scripts",
-      root,
-    ],
+    ["--filter", "@morlay/dsh-desktop-shell", "deploy", "--prod", "--ignore-scripts", root],
     await findWorkspaceRoot(SHELL_PACKAGE_ROOT),
   );
-  log.info("shell.ready %o", { "entries": await readdir(root) });
+  log.info("shell.ready %o", { entries: await readdir(root) });
   // preload 的 CJS 在**这里**打好（运行时只读文件）：打包器是 native 模块，读不了 app.asar 内的源码。
   const preloadDir = join(root, "dist");
   await mkdir(preloadDir, { recursive: true });
   await writeFile(join(preloadDir, "preload.cjs"), await bundlePreload({ shellRoot: root }));
-  log.info("shell.preload %o", { "file": join("dist", "preload.cjs") });
+  log.info("shell.preload %o", { file: join("dist", "preload.cjs") });
 
   // 入口**自动生成**：Electron 的 app 目录必须有一个真 JS 入口，内容就三件事——报出包根、让 Node 能跑
   // `node_modules` 下的 `.ts`、按**包名**加载业务入口（走本目录清单的 `exports`）。

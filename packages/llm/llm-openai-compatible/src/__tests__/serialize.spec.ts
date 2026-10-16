@@ -12,10 +12,7 @@ import {
 import type { GenerateOptions, Message } from "@deepseek-ai/dsh-llm";
 import { AttachmentId } from "@deepseek-ai/dsh-attachment";
 import type { AttachmentStore, ImageAttachmentRef } from "@deepseek-ai/dsh-attachment";
-import type {
-  ResolvedModelProfile,
-  ResolvedProviderProfile,
-} from "../index.ts";
+import type { ResolvedModelProfile, ResolvedProviderProfile } from "../index.ts";
 import {
   resolveReasoningWire,
   serializeCallOptions,

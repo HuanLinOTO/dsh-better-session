@@ -29,7 +29,7 @@ export interface DeveloperMenuOptions {
 }
 
 function reportFailure(options: DeveloperMenuOptions, title: string, detail: string): void {
-// 开发菜单是壳里的调试面（dev 形态才出现）：失败信息走终端，不进 shell.log。
+  // 开发菜单是壳里的调试面（dev 形态才出现）：失败信息走终端，不进 shell.log。
   console.error(`[dsh-shell] ${title}: ${detail}`);
   const parent = options.mainWindow();
   if (parent === undefined || parent.isDestroyed()) dialog.showErrorBox(title, detail);

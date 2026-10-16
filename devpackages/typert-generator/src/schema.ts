@@ -69,7 +69,8 @@ export async function buildSchemaIndex(
         // 同名类型可能出现在同包的多个声明文件里（`src/types.ts` 是定义、`src/control.ts` 可能只是一段
         // 再导出）：保留**带出口子路径**的那份，`typeSymbol` 才指得准（registry 按它找 schema）。
         const previous = index.get(name);
-        if (previous !== undefined && (previous.owner.includes("/") || !owner.includes("/"))) continue;
+        if (previous !== undefined && (previous.owner.includes("/") || !owner.includes("/")))
+          continue;
         index.set(name, {
           name,
           file,
@@ -240,7 +241,8 @@ export function zodOf(node: Node | undefined, context: EmitContext): string {
       // 而声明树按文件摊开、看不到合并结果。上游由类型检查器求值，这条 AST 路线求不了，兜底 `unknown`
       // （宽松，不拒合法值）。
       if (object["type"] === "TSMappedType") return "z.unknown() /* TODO 映射类型索引访问 */";
-      const name = object["type"] === "TSTypeReference" ? nameOf(object["typeName"] as Node) : undefined;
+      const name =
+        object["type"] === "TSTypeReference" ? nameOf(object["typeName"] as Node) : undefined;
       const declared = name === undefined ? undefined : context.index.get(name);
       const members = (declared?.node["body"]?.["body"] ?? []) as Node[];
       // 索引访问也能自引用（`T = T['k']`），所以和引用一样过一遍展开栈。
@@ -248,33 +250,33 @@ export function zodOf(node: Node | undefined, context: EmitContext): string {
       if (context.stack.has(guard)) return "z.unknown()";
       context.stack.add(guard);
       try {
-      // `T[keyof T]`：取所有字段值类型的 union（`ModelModality` 就是这种写法）。
-      if (key["type"] === "TSTypeOperator" && key["operator"] === "keyof") {
-        const values = members
-          .filter((member) => member["type"] === "TSPropertySignature")
-          .map((member) => zodOf(member["typeAnnotation"]?.["typeAnnotation"] as Node, context));
-        const unique = [...new Set(values)];
-        return unique.length === 1 ? (unique[0] as string) : `z.union([${unique.join(", ")}])`;
-      }
-      const field =
-        nameOf(key) ??
-        (key["type"] === "TSLiteralType"
-          ? String(key["literal"]?.["value"])
-          : typeof key["value"] === "string"
-            ? key["value"]
-            : undefined);
-      const target = members.find((member) => nameOf(member["key"] as Node) === field);
-      if (target === undefined) {
-        throw new Error(
-          `索引访问解析失败：${String(name)}[${String(field)}] `
-            + `@ ${String(context.file)}#${String(node["start"])} `
-            + `objectType=${String(object["type"])} indexType=${String(key["type"])}`,
-        );
-      }
-      let value = zodOf(target["typeAnnotation"]?.["typeAnnotation"] as Node, context);
-      if (target["optional"] === true) value += ".optional()";
-      if (target["readonly"] === true) value += ".readonly()";
-      return value;
+        // `T[keyof T]`：取所有字段值类型的 union（`ModelModality` 就是这种写法）。
+        if (key["type"] === "TSTypeOperator" && key["operator"] === "keyof") {
+          const values = members
+            .filter((member) => member["type"] === "TSPropertySignature")
+            .map((member) => zodOf(member["typeAnnotation"]?.["typeAnnotation"] as Node, context));
+          const unique = [...new Set(values)];
+          return unique.length === 1 ? (unique[0] as string) : `z.union([${unique.join(", ")}])`;
+        }
+        const field =
+          nameOf(key) ??
+          (key["type"] === "TSLiteralType"
+            ? String(key["literal"]?.["value"])
+            : typeof key["value"] === "string"
+              ? key["value"]
+              : undefined);
+        const target = members.find((member) => nameOf(member["key"] as Node) === field);
+        if (target === undefined) {
+          throw new Error(
+            `索引访问解析失败：${String(name)}[${String(field)}] ` +
+              `@ ${String(context.file)}#${String(node["start"])} ` +
+              `objectType=${String(object["type"])} indexType=${String(key["type"])}`,
+          );
+        }
+        let value = zodOf(target["typeAnnotation"]?.["typeAnnotation"] as Node, context);
+        if (target["optional"] === true) value += ".optional()";
+        if (target["readonly"] === true) value += ".readonly()";
+        return value;
       } finally {
         context.stack.delete(guard);
       }
@@ -417,11 +419,17 @@ function viaAlias(name: string, context: EmitContext): TypeDecl | undefined {
   const alias = aliases?.get(name);
   if (alias === undefined || ("namespace" in alias && alias.namespace === true)) return undefined;
   // 相对导入在建表时就解析成声明了；跨包导入再去出口表查一次。
-  const resolved = "declared" in alias ? alias.declared : context.exports?.get(alias.pkg)?.get(alias.name);
+  const resolved =
+    "declared" in alias ? alias.declared : context.exports?.get(alias.pkg)?.get(alias.name);
   if (resolved === undefined || !isTypeDeclaration(resolved.node)) return undefined;
   return {
     name,
-    owner: "declared" in alias ? (alias.declared.file.includes("/packages/") ? packageOf(alias.declared.file) : "") : alias.pkg,
+    owner:
+      "declared" in alias
+        ? alias.declared.file.includes("/packages/")
+          ? packageOf(alias.declared.file)
+          : ""
+        : alias.pkg,
     node: resolved.node,
     file: resolved.file,
     text: resolved.text,
@@ -429,13 +437,23 @@ function viaAlias(name: string, context: EmitContext): TypeDecl | undefined {
 }
 
 /** 命名空间导入（`import type * as Host from '@fixture/host'`）下的限定名。 */
-function viaNamespace(namespace: string, exported: string, context: EmitContext): TypeDecl | undefined {
+function viaNamespace(
+  namespace: string,
+  exported: string,
+  context: EmitContext,
+): TypeDecl | undefined {
   const key = context.file === undefined ? undefined : relativeKey(context.file);
   const alias = key === undefined ? undefined : context.aliases?.get(key)?.get(namespace);
   if (alias === undefined || "declared" in alias) return undefined;
   const declared = context.exports?.get(alias.pkg)?.get(exported);
   if (declared === undefined || !isTypeDeclaration(declared.node)) return undefined;
-  return { name: exported, owner: alias.pkg, node: declared.node, file: declared.file, text: declared.text };
+  return {
+    name: exported,
+    owner: alias.pkg,
+    node: declared.node,
+    file: declared.file,
+    text: declared.text,
+  };
 }
 
 function referenceOf(node: Node, context: EmitContext): string {
@@ -498,7 +516,10 @@ function referenceOf(node: Node, context: EmitContext): string {
         declaredSelf?.node["type"] === "TSTypeAliasDeclaration"
           ? zodOf(declaredSelf.node["typeAnnotation"] as Node, context)
           : zodOf(
-              { type: "TSTypeLiteral", members: (declaredSelf?.node["body"]?.["body"] ?? []) as Node[] },
+              {
+                type: "TSTypeLiteral",
+                members: (declaredSelf?.node["body"]?.["body"] ?? []) as Node[],
+              },
               context,
             );
       context.named.set(symbol, definition);
@@ -517,7 +538,8 @@ function referenceOf(node: Node, context: EmitContext): string {
     const mapping = new Map(callerArguments);
     parameters.forEach((parameter, position) => {
       const parameterName = nameOf((parameter["name"] ?? parameter) as Node);
-      const argument = args[position] ?? (parameter["default"] as Node | null | undefined) ?? undefined;
+      const argument =
+        args[position] ?? (parameter["default"] as Node | null | undefined) ?? undefined;
       if (parameterName !== undefined && argument !== undefined && argument !== null) {
         mapping.set(parameterName, argument);
       }

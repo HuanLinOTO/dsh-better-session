@@ -510,7 +510,7 @@ export class DesktopHostProcess {
       try {
         this.options.onFailure?.(error);
       } catch (listenerError) {
-// 监听器自己抛错：这条通道可能已经坏了，记不了就只留一行 stderr。
+        // 监听器自己抛错：这条通道可能已经坏了，记不了就只留一行 stderr。
         console.error(listenerError);
       }
     }

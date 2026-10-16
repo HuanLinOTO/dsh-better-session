@@ -113,18 +113,24 @@ desktop
 
 program
   .command("check-deps")
-  .description("scan a package's runtime imports (from its entry) and report the ones that cannot resolve")
+  .description(
+    "scan a package's runtime imports (from its entry) and report the ones that cannot resolve",
+  )
   .argument("[package]", "package directory (default: current directory)")
   .action(async (pkg: string | undefined) => {
     const { reportRuntimeDependencies } = await import("./runtime-deps.ts");
     // **单包视角**：批量交给 `pnpm -r exec dshdev check-deps`，这里不扫全仓。
-    const missing = await reportRuntimeDependencies(pkg === undefined ? process.cwd() : resolve(pkg));
+    const missing = await reportRuntimeDependencies(
+      pkg === undefined ? process.cwd() : resolve(pkg),
+    );
     if (missing.length > 0) process.exitCode = 1;
   });
 
 program
   .command("check-locale")
-  .description("check the faces only `dsh.bundle` packages need: locale exports, published files, en/zh titles")
+  .description(
+    "check the faces only `dsh.bundle` packages need: locale exports, published files, en/zh titles",
+  )
   .argument("[root]", "repository root (default: current directory)")
   .action(async (root: string | undefined) => {
     const { reportLocaleFaces } = await import("./check-locale.ts");
@@ -135,7 +141,9 @@ program
 
 program
   .command("publish")
-  .description("publish the package in the current directory if its version is new (CI step; don't run locally)")
+  .description(
+    "publish the package in the current directory if its version is new (CI step; don't run locally)",
+  )
   .option("--registry <url>", "registry to publish to (default: GitHub Packages)")
   .option("--branch <name>", "branch recorded in the published manifest")
   .action(async (options: { registry?: string; branch?: string }) => {

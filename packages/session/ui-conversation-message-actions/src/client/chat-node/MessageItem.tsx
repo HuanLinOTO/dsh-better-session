@@ -68,16 +68,22 @@ function UserStyleBubble({
   actions?: (text: string) => ReactNode;
 }): ReactNode {
   const parts = useMemo(() => contentParts(content), [content]);
-  const prepared = useMemo<UserContentData>(() => ({
-    text: parts.text,
-    attachments: parts.attachments,
-    extraBlocks: parts.rest,
-    ...(referenceLabels === undefined ? {} : { referenceLabels }),
-  }), [parts, referenceLabels]);
-  const facts = useMemo<Readonly<Partial<UserTextFacts>>>(() => ({
-    ...(referenceLabels === undefined ? {} : { sessionLabels: referenceLabels }),
-    ...(skillNames === undefined ? {} : { skillNames }),
-  }), [referenceLabels, skillNames]);
+  const prepared = useMemo<UserContentData>(
+    () => ({
+      text: parts.text,
+      attachments: parts.attachments,
+      extraBlocks: parts.rest,
+      ...(referenceLabels === undefined ? {} : { referenceLabels }),
+    }),
+    [parts, referenceLabels],
+  );
+  const facts = useMemo<Readonly<Partial<UserTextFacts>>>(
+    () => ({
+      ...(referenceLabels === undefined ? {} : { sessionLabels: referenceLabels }),
+      ...(skillNames === undefined ? {} : { skillNames }),
+    }),
+    [referenceLabels, skillNames],
+  );
   return (
     <Stack align="end" gap={6} data-time-hover-root>
       {/* 内容整块交回上游工厂 `conversation.chat.user.content`：附件（含图片槽 `user.images`）、文本与

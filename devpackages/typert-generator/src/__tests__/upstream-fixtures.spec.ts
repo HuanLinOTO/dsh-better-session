@@ -92,7 +92,8 @@ describe("上游 fixtures", () => {
     const artifacts = await generateTypert({ upstreamRoot, dtsRoot });
     const goals = artifacts.find((artifact) => artifact.package === "@fixture/remote");
     expect(goals).toBeDefined();
-    const remote = goals?.files.find((file) => file.path.endsWith("typert.remote-client.ts"))?.text ?? "";
+    const remote =
+      goals?.files.find((file) => file.path.endsWith("typert.remote-client.ts"))?.text ?? "";
     // `@Remote`：普通 unary，`AbortSignal` 记成 cancellation
     expect(remote).toContain("id: '@fixture/remote#goals/create'");
     expect(remote).toContain("cancellation: { parameter: 'signal' }");
@@ -100,7 +101,7 @@ describe("上游 fixtures", () => {
     expect(remote).toContain("method: 'watch'");
     expect(remote).toContain("mode: 'stream'");
     // `@RemoteScope('agent')`：首个参数按上下文查找传
-    expect(remote).toContain('context: \'agent\'');
+    expect(remote).toContain("context: 'agent'");
     expect(remote).toContain("source: 'lookup'");
     expect(remote).toContain("lookup: 'agent'");
   });

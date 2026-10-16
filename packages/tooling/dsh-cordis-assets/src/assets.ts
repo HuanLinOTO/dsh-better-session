@@ -88,9 +88,11 @@ export function clientAssetPlugin(options: { assets?: CssAssetPolicy } = {}): Pl
       order: "pre",
       handler(source: string, importer: string | undefined) {
         if (NODE_BUILTIN.test(source)) return nodeBuiltinStubPath();
-        if (source.endsWith("?raw")) return `${RAW_PREFIX}${resolveFileSpecifier(source.slice(0, -4), importer)}${RAW_SUFFIX}`;
+        if (source.endsWith("?raw"))
+          return `${RAW_PREFIX}${resolveFileSpecifier(source.slice(0, -4), importer)}${RAW_SUFFIX}`;
         const file = source.split("?", 1)[0] ?? "";
-        if (mimeOf(file) !== undefined) return `${ASSET_PREFIX}${resolveFileSpecifier(file, importer)}`;
+        if (mimeOf(file) !== undefined)
+          return `${ASSET_PREFIX}${resolveFileSpecifier(file, importer)}`;
         return null;
       },
     },

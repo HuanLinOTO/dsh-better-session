@@ -40,22 +40,25 @@
    actions row on hover or focus-within. Opacity keeps layout stable, and
    devices without hover keep every row visible. */
 @media (hover: hover) {
-  [data-actions-reveal='hover'] .actions,
-  :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering']):has(
-    ~ :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering'])
-  ) .actions {
+  [data-actions-reveal="hover"] .actions,
+  :is([data-chat-flow-kind="user"], [data-chat-flow-kind="steering"]):has(
+      ~ :is([data-chat-flow-kind="user"], [data-chat-flow-kind="steering"])
+    )
+    .actions {
     opacity: 0;
     transition: opacity 80ms ease;
   }
 
-  [data-actions-reveal='hover']:hover .actions,
-  [data-actions-reveal='hover']:focus-within .actions,
-  :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering']):has(
-    ~ :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering'])
-  ):hover .actions,
-  :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering']):has(
-    ~ :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering'])
-  ):focus-within .actions {
+  [data-actions-reveal="hover"]:hover .actions,
+  [data-actions-reveal="hover"]:focus-within .actions,
+  :is([data-chat-flow-kind="user"], [data-chat-flow-kind="steering"]):has(
+      ~ :is([data-chat-flow-kind="user"], [data-chat-flow-kind="steering"])
+    ):hover
+    .actions,
+  :is([data-chat-flow-kind="user"], [data-chat-flow-kind="steering"]):has(
+      ~ :is([data-chat-flow-kind="user"], [data-chat-flow-kind="steering"])
+    ):focus-within
+    .actions {
     opacity: 1;
   }
 }
@@ -81,7 +84,7 @@
   height: calc(15px + var(--dsh-content-font-delta, 0px));
 }
 
-.actions[data-clock='end'] .action svg {
+.actions[data-clock="end"] .action svg {
   width: calc(17px + var(--dsh-content-font-delta, 0px));
   height: calc(17px + var(--dsh-content-font-delta, 0px));
 }

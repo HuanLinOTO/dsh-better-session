@@ -266,7 +266,6 @@ function isExternal(id: string, externals: (string | RegExp)[]): boolean {
   return externals.some((e) => (typeof e === "string" ? id === e : e.test(id)));
 }
 
-
 // 平台 baseline：主应用种子或静态表提供的模块（React / cordis / 共享原语）。
 const BASELINE: (string | RegExp)[] = [
   "react",

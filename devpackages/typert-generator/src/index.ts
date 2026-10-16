@@ -48,7 +48,8 @@ async function lookupContexts(
           if (key === undefined || annotation === undefined) continue;
           const args = typeArgumentsOf(annotation);
           const idType = argumentName(args.at(-1));
-          const objectType = interfaceName === "TypertLookupMap" ? argumentName(args[0]) : undefined;
+          const objectType =
+            interfaceName === "TypertLookupMap" ? argumentName(args[0]) : undefined;
           if (idType === undefined) continue;
           // `TypertLookupMap` 给"对象 → id"的对照（`agent: TypertLookup<Agent, SessionId>`），
           // `TypertContextMap` 只给 id；两张表都注册同一个键时，保留带对象名的那条。
@@ -174,7 +175,11 @@ function serviceHeaderOf(klass: Node): { serviceKey: string; namespace: string }
 }
 
 /** `@Remote('wire')` 的第一个字符串参数是 **wire 名**（缺省用方法名）；`@Remote({ mode: … })` 给载体。 */
-function remoteOptionsOf(member: Node): { wireName?: string; scope?: string; mode: "direct" | "stream" } {
+function remoteOptionsOf(member: Node): {
+  wireName?: string;
+  scope?: string;
+  mode: "direct" | "stream";
+} {
   let wireName: string | undefined;
   let scope: string | undefined;
   let mode: "direct" | "stream" = "direct";
@@ -196,14 +201,21 @@ function remoteOptionsOf(member: Node): { wireName?: string; scope?: string; mod
         wireName = argument["value"];
       } else if (argument["type"] === "ObjectExpression") {
         for (const property of argument["properties"] as Node[]) {
-          if (nameOf(property["key"] as Node) === "mode" && property["value"]?.["value"] === "stream") {
+          if (
+            nameOf(property["key"] as Node) === "mode" &&
+            property["value"]?.["value"] === "stream"
+          ) {
             mode = "stream";
           }
         }
       }
     }
   }
-  return { ...(wireName === undefined ? {} : { wireName }), ...(scope === undefined ? {} : { scope }), mode };
+  return {
+    ...(wireName === undefined ? {} : { wireName }),
+    ...(scope === undefined ? {} : { scope }),
+    mode,
+  };
 }
 
 /** 声明面签名里的参数文本（源码切片，保留 `signal?: AbortSignal` 这类取消通道）。 */
@@ -216,8 +228,11 @@ function signatureParametersOf(source: string, member: Node): string {
       const text = source.slice(start, end).replace(/\s+/gu, " ").trim();
       // 取消通道在声明面上是可选的（调用方可以不给），wire 上则整个不进参数表。
       const isCancellation =
-        nameOf((parameter["typeAnnotation"]?.["typeAnnotation"] as Node)?.["typeName"] as Node | undefined) ===
-        "AbortSignal";
+        nameOf(
+          (parameter["typeAnnotation"]?.["typeAnnotation"] as Node)?.["typeName"] as
+            | Node
+            | undefined,
+        ) === "AbortSignal";
       return isCancellation && !text.includes("?") ? text.replace(":", "?:") : text;
     })
     .join(", ");
@@ -271,7 +286,9 @@ function remoteMethodsOf(
     const scopeHit = declaredParameters
       .map((parameter) => {
         const typeName = nameOf(
-          (parameter["typeAnnotation"]?.["typeAnnotation"] as Node)?.["typeName"] as Node | undefined,
+          (parameter["typeAnnotation"]?.["typeAnnotation"] as Node)?.["typeName"] as
+            | Node
+            | undefined,
         );
         if (typeName === undefined) return undefined;
         for (const [key, entry] of contexts) {
@@ -495,9 +512,17 @@ export async function generateTypert(options: GenerateOptions): Promise<Generate
   const surfaces = await packageSurfaces(discovered);
   if (process.env["TYPERT_DEBUG"] === "1") {
     const att = surfaces.exports.get("@deepseek-ai/dsh-attachment");
-    console.error("[dbg] attachment 出口:", JSON.stringify([...(att?.keys() ?? [])].filter((k) => k.toLowerCase().includes("attachmentid"))));
+    console.error(
+      "[dbg] attachment 出口:",
+      JSON.stringify(
+        [...(att?.keys() ?? [])].filter((k) => k.toLowerCase().includes("attachmentid")),
+      ),
+    );
     const aliases = surfaces.aliases.get("api/session-controller/src/types");
-    console.error("[dbg] types.ts 别名:", JSON.stringify([...(aliases?.entries() ?? [])].slice(0, 4)));
+    console.error(
+      "[dbg] types.ts 别名:",
+      JSON.stringify([...(aliases?.entries() ?? [])].slice(0, 4)),
+    );
   }
   surfaceExports = surfaces.exports;
   surfaceAliases = surfaces.aliases;
@@ -698,7 +723,9 @@ export function renderRemoteClient(
   for (const service of services) {
     lines.push(`  interface TypertRemoteNamespace$${hexOf(service.namespace)} {`);
     for (const method of service.methods) {
-      lines.push(`    ${method.method}: ${signatureFor(method, service.file.source, method.scope !== undefined)}`);
+      lines.push(
+        `    ${method.method}: ${signatureFor(method, service.file.source, method.scope !== undefined)}`,
+      );
     }
     lines.push("  }");
   }
@@ -1082,7 +1109,10 @@ function signatureParametersWithoutScope(method: RemoteMethod): string {
   if (scopeParameterName === undefined || method.signatureParameters === "") return "";
   return method.signatureParameters
     .split(", ")
-    .filter((part) => !part.startsWith(`${scopeParameterName}:`) && !part.startsWith(`${scopeParameterName}?:`))
+    .filter(
+      (part) =>
+        !part.startsWith(`${scopeParameterName}:`) && !part.startsWith(`${scopeParameterName}?:`),
+    )
     .join(", ");
 }
 
@@ -1094,7 +1124,9 @@ function signatureParametersWithoutScope(method: RemoteMethod): string {
  *
  * 两者合起来就能把 `HostAgent`、`Host.Agent`、`import('@fixture/host').Agent` 这类写法指回真实声明。
  */
-export async function packageSurfaces(packages: readonly { name: string; root: string }[]): Promise<{
+export async function packageSurfaces(
+  packages: readonly { name: string; root: string }[],
+): Promise<{
   exports: Map<string, Map<string, { node: Node; file: string; text: string }>>;
   aliases: Map<string, Map<string, AliasEntry>>;
 }> {
@@ -1124,7 +1156,10 @@ export async function packageSurfaces(packages: readonly { name: string; root: s
     // wire 面要的是类型，类型优先，非类型只在没有类型时兜底。
     const put = (name: string, entry: { node: Node; file: string; text: string }): void => {
       const previous = table.get(name);
-      if (previous !== undefined && (isTypeDeclaration(previous.node) || !isTypeDeclaration(entry.node))) {
+      if (
+        previous !== undefined &&
+        (isTypeDeclaration(previous.node) || !isTypeDeclaration(entry.node))
+      ) {
         return;
       }
       table.set(name, entry);
@@ -1212,8 +1247,9 @@ export async function packageSurfaces(packages: readonly { name: string; root: s
         if (typeof source !== "string") continue;
         // 跨包导入用包名当目标；同包的相对导入（`import { A as B } from './types.ts'`）记文件路径，
         // 解析时顺着那个文件找导出。
-        const target =
-          byName.has(source) ? source : (await resolveRelative(file, source)) ?? undefined;
+        const target = byName.has(source)
+          ? source
+          : ((await resolveRelative(file, source)) ?? undefined);
         if (target === undefined) continue;
         const isPackage = byName.has(target);
         for (const specifier of (statement["specifiers"] ?? []) as Node[]) {
@@ -1234,10 +1270,10 @@ export async function packageSurfaces(packages: readonly { name: string; root: s
           // 同包的相对导入：当场解析出目标声明（同文件的重命名导入也算跨包的一种）。
           const declared =
             imported === "default"
-              ? (await exportedNode(target, "default", new Set())) ?? undefined
-              : (await exportedNode(target, imported, new Set())) ??
+              ? ((await exportedNode(target, "default", new Set())) ?? undefined)
+              : ((await exportedNode(target, imported, new Set())) ??
                 (await exportedNode(target, local, new Set())) ??
-                undefined;
+                undefined);
           if (declared !== undefined) table.set(local, { declared });
         }
       }

@@ -25,8 +25,10 @@ const wsPort = process.argv
 // "页面在 `dsh-custom-next:` 协议下、hostname 是 `app`"：窗口现在从宿主真 webServer 的 origin
 // （`http://127.0.0.1:<port>`）载入，那个条件永远不成立，会让下面这些桌面专用注入整块失效。
 if (scheme !== undefined && scheme !== "") {
-// preload 脚本**跑在页面里**（浏览器没有 cordis 树，也没有壳的日志出口）：这里的 console 是页面日志。
-  console.log(`[dsh-shell] preload: scheme=${String(scheme)} wsPort=${String(wsPort)} webFrame=${typeof webFrame}`);
+  // preload 脚本**跑在页面里**（浏览器没有 cordis 树，也没有壳的日志出口）：这里的 console 是页面日志。
+  console.log(
+    `[dsh-shell] preload: scheme=${String(scheme)} wsPort=${String(wsPort)} webFrame=${typeof webFrame}`,
+  );
   contextBridge.exposeInMainWorld("__DSH_DIRECTORY_PICKER__", {
     pick: () => ipcRenderer.invoke(DESKTOP_IPC.directoryPick) as Promise<string | null>,
   });

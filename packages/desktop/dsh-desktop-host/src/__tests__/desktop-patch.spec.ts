@@ -163,7 +163,9 @@ describe("桌面 overlay 的停用清单", () => {
 /** 桌面 overlay 给 `webserver` 定的端口。 */
 function portOfWebServer(source: string): number | undefined {
   const row = source.split("\n- id: ").find((chunk) => chunk.startsWith("webserver"));
-  return row === undefined ? undefined : /port: (\d+)/.exec(row)?.[1] === undefined
+  return row === undefined
     ? undefined
-    : Number(/port: (\d+)/.exec(row)?.[1]);
+    : /port: (\d+)/.exec(row)?.[1] === undefined
+      ? undefined
+      : Number(/port: (\d+)/.exec(row)?.[1]);
 }

@@ -132,7 +132,9 @@ describe("client bundle CSS", () => {
 
       // 资产文件名（`assets/big-<hash>.png`）。`emitFile` 的返回值是 rollup 的**引用 id**
       // （形如 `VRAku6fjghkApIISiBWPzg`）——拿它当 URL 就是"资产在盘上、页面却不显示"。占位也必须被换掉。
-      expect(thresholdCode).toMatch(/\/@client-modules\/demo@1\.0\.0\/assets\/big-[A-Za-z0-9_-]+\.png/);
+      expect(thresholdCode).toMatch(
+        /\/@client-modules\/demo@1\.0\.0\/assets\/big-[A-Za-z0-9_-]+\.png/,
+      );
       expect(thresholdCode).not.toContain("__DSH_ASSET_");
     });
 

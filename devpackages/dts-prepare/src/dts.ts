@@ -153,7 +153,10 @@ async function run(command: string, args: readonly string[], cwd: string): Promi
 
 /** 路径存在与否（任何 stat 失败都算不存在）。 */
 async function exists(path: string): Promise<boolean> {
-  return await stat(path).then(() => true, () => false);
+  return await stat(path).then(
+    () => true,
+    () => false,
+  );
 }
 
 /**
@@ -185,7 +188,10 @@ export async function ensureWorkspaceDts(root: string): Promise<void> {
     } catch {
       // 拿不到锁：等一会儿再看——要么别人建好了声明树，要么那把锁陈了。
       if (await exists(doneMark)) return;
-      const age = await stat(lockDir).then((info) => Date.now() - info.mtimeMs, () => 0);
+      const age = await stat(lockDir).then(
+        (info) => Date.now() - info.mtimeMs,
+        () => 0,
+      );
       if (age > staleMs) await rm(lockDir, { recursive: true, force: true });
       await new Promise((resolveWait) => setTimeout(resolveWait, 500));
     }

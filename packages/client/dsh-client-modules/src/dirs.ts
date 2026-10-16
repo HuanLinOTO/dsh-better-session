@@ -38,7 +38,12 @@ export async function profileDir(): Promise<string> {
     (value): value is string => value !== undefined && value !== "",
   );
   for (const candidate of candidates) {
-    if (await readFile(join(candidate, "package.json"), "utf8").then(() => true, () => false)) {
+    if (
+      await readFile(join(candidate, "package.json"), "utf8").then(
+        () => true,
+        () => false,
+      )
+    ) {
       return candidate;
     }
   }

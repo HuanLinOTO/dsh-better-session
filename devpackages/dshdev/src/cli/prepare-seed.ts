@@ -16,15 +16,9 @@ import {
 import { dirname, join, relative, resolve } from "node:path";
 
 import { OFFICIAL_PROFILE_BUNDLES } from "@morlay/dsh-desktop-shell/official";
-import {
-  PROFILE_WORKSPACE_NAME,
-} from "@morlay/dsh-desktop-shell/profile-project";
+import { PROFILE_WORKSPACE_NAME } from "@morlay/dsh-desktop-shell/profile-project";
 import { SEED_HASH_NAME, SEED_RUNTIME_DIR_NAME } from "@morlay/dsh-desktop-shell/seed";
-import {
-  closurePackageDirs,
-  copyPackageTree,
-  missingOfficialPackages,
-} from "./official-deps.ts";
+import { closurePackageDirs, copyPackageTree, missingOfficialPackages } from "./official-deps.ts";
 import {
   PROFILE_NAME,
   desktopProfileBundles,
@@ -48,7 +42,6 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-
 async function inheritDeploySettings(root: string, destination: string): Promise<void> {
   const sourcePath = join(root, "pnpm-workspace.yaml");
   const targetPath = join(destination, "pnpm-workspace.yaml");
@@ -57,7 +50,6 @@ async function inheritDeploySettings(root: string, destination: string): Promise
   const merged = mergedDeploySettings(await readFile(sourcePath, "utf8"), target);
   if (merged !== target) await writeFile(targetPath, merged);
 }
-
 
 /**
  * 闭包里缺官方包时的报错：`missing` 是「缺的包 → 谁声明了它」（见 `missingOfficialPackages`）。
@@ -116,7 +108,7 @@ async function dropClientModulesCache(surface: string): Promise<void> {
 export async function prepareDeploySurface(workspace: string): Promise<string> {
   const manifest = await workspaceManifest(workspace);
   const destination = join(buildCache(workspace), "deploy");
-  log.info("deploy %o", { "dir": destination });
+  log.info("deploy %o", { dir: destination });
   await deployClosure(workspace, manifest.name, destination);
   // profile 面那几个文件（行清单等）按 app 的样子带过去：deploy 的产物是"安装结果"，不含它们。
   for (const entry of seedEntries(workspace, manifest)) {
@@ -128,9 +120,11 @@ export async function prepareDeploySurface(workspace: string): Promise<string> {
   return destination;
 }
 
-
-
-export async function deployClosure(workspace: string, name: string, destination: string): Promise<void> {
+export async function deployClosure(
+  workspace: string,
+  name: string,
+  destination: string,
+): Promise<void> {
   const root = await findWorkspaceRoot(workspace);
   await rm(destination, { recursive: true, force: true });
   await mkdir(destination, { recursive: true });
@@ -358,8 +352,8 @@ export async function runPrepareSeed(options: PrepareSeedOptions): Promise<void>
   const seedOutputRoot = join(buildCacheDir, "seed");
   const deployRoot = join(buildCacheDir, "deploy");
   const entries = seedEntries(workspace, manifest);
-  log.info("seed %o", { "workspace": workspace, "app.name": manifest.name });
-  log.info("seed.entries %o", { "entries": entries });
+  log.info("seed %o", { workspace: workspace, "app.name": manifest.name });
+  log.info("seed.entries %o", { entries: entries });
 
   await deployClosure(workspace, manifest.name, deployRoot);
 
@@ -399,9 +393,9 @@ export async function runPrepareSeed(options: PrepareSeedOptions): Promise<void>
   });
   await writeFile(join(profileDir, SEED_HASH_NAME), fingerprint);
   log.info("seed %o", {
-    "dir": seedOutputRoot,
-    "fingerprint": fingerprint.slice(0, 12),
-    "bundles": localBundles,
+    dir: seedOutputRoot,
+    fingerprint: fingerprint.slice(0, 12),
+    bundles: localBundles,
   });
 }
 
@@ -569,4 +563,3 @@ async function allowedBuilds(deployRoot: string): Promise<string> {
   if (!(await pathExists(path))) return "";
   return topLevelYamlBlock(await readFile(path, "utf8"), "allowBuilds") ?? "";
 }
-

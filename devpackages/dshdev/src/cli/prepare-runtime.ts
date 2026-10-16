@@ -1,7 +1,17 @@
 import { logOf } from "@local/devkit/log";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { access, chmod, cp, mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  access,
+  chmod,
+  cp,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { createReadStream, createWriteStream } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -256,7 +266,7 @@ async function prepareBin(platform: RuntimePlatform, runtimeRoot: string): Promi
  * @returns 层目录（`node_modules`）。
  */
 function storeLayerOf(packageRoot: string): string {
-  for (let dir = packageRoot; ; ) {
+  for (let dir = packageRoot; ;) {
     if (basename(dir) === "node_modules") return dir;
     const parent = dirname(dir);
     if (parent === dir)
@@ -328,9 +338,9 @@ export async function runPrepareRuntime(options: PrepareRuntimeOptions): Promise
     )}\n`,
   );
   log.info("runtime %o", {
-    "node": NODE_VERSION,
-    "pnpm": pnpmVersion,
-    "oxc": loaderVersion,
-    "platform": `${platform}-${arch}`,
+    node: NODE_VERSION,
+    pnpm: pnpmVersion,
+    oxc: loaderVersion,
+    platform: `${platform}-${arch}`,
   });
 }

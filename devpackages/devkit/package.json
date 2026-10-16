@@ -2,6 +2,10 @@
   "name": "@local/devkit",
   "version": "0.1.0",
   "private": true,
+  "files": [
+    "src",
+    "tsconfig.json"
+  ],
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
@@ -26,9 +30,5 @@
   "peerDependencies": {
     "tsdown": "0.23.x",
     "typescript": "7.x"
-  },
-  "files": [
-    "src",
-    "tsconfig.json"
-  ]
+  }
 }

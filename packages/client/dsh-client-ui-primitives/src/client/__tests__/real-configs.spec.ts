@@ -10,12 +10,7 @@ import { addableAt, fieldKey } from "../schema-form/controller.ts";
 import type { SchemaFormState } from "../schema-form/controller.ts";
 import { editorLines, type EditorLine } from "../schema-form/lines.ts";
 import { zh } from "../schema-form/locales.ts";
-import {
-  projectNode,
-  readPath,
-  walkFields,
-  type FieldNode,
-} from "../schema-form/schema-node.ts";
+import { projectNode, readPath, walkFields, type FieldNode } from "../schema-form/schema-node.ts";
 import type { SchemaFormTranslate } from "../schema-form/slot-contract.ts";
 
 const t = ((key: string) =>
@@ -56,7 +51,6 @@ function linesOf(schema: unknown, value: unknown): EditorLine[] {
   return editorLines(state, { collapsed: () => false, toggle: () => {} }, resolveText, t);
 }
 
-
 // 某条路径上的那一行。
 function lineAt(lines: readonly EditorLine[], path: string): EditorLine | undefined {
   return lines.find(
@@ -68,7 +62,6 @@ function lineAt(lines: readonly EditorLine[], path: string): EditorLine | undefi
 function fieldPaths(lines: readonly EditorLine[]): string[] {
   return lines.filter((line) => line.kind === "field").map((line) => line.path.join("."));
 }
-
 
 describe("真配置排出的行", () => {
   it("session-rdb 的 type 是判别标签：那一行带切换，切到另一支就换一整套字段", () => {

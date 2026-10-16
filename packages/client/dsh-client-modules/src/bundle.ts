@@ -147,7 +147,11 @@ async function fingerprint(paths: readonly string[]): Promise<string> {
     const info = await stat(path).catch(() => undefined);
     if (info === undefined) return;
     if (!info.isDirectory()) {
-      stampHash.update(`${relative(paths[0] ?? path, path).split(sep).join("/")}:${String(info.size)}:${String(info.mtimeMs)}`);
+      stampHash.update(
+        `${relative(paths[0] ?? path, path)
+          .split(sep)
+          .join("/")}:${String(info.size)}:${String(info.mtimeMs)}`,
+      );
       return;
     }
     const entries = await readdir(path, { withFileTypes: true }).catch(() => []);
@@ -165,7 +169,11 @@ async function fingerprint(paths: readonly string[]): Promise<string> {
     const info = await stat(path).catch(() => undefined);
     if (info === undefined) return;
     if (!info.isDirectory()) {
-      hash.update(`${relative(paths[0] ?? path, path).split(sep).join("/")}:${String(info.size)}`);
+      hash.update(
+        `${relative(paths[0] ?? path, path)
+          .split(sep)
+          .join("/")}:${String(info.size)}`,
+      );
       hash.update(await readFile(path));
       return;
     }
@@ -223,7 +231,9 @@ export async function resolvableVersionsFor(
   return await computed;
 }
 
-export async function resolvableVersionsOf(manifestPath: string | undefined): Promise<Map<string, string>> {
+export async function resolvableVersionsOf(
+  manifestPath: string | undefined,
+): Promise<Map<string, string>> {
   const versions = new Map<string, string>();
   if (manifestPath === undefined) return versions;
   const here = pathToFileURL(manifestPath).href;
@@ -250,7 +260,9 @@ export async function resolvableVersionsOf(manifestPath: string | undefined): Pr
       continue;
     }
     if (found === undefined) continue;
-    const parsed = JSON.parse(await readFile(found, "utf8").catch(() => "{}")) as { version?: unknown };
+    const parsed = JSON.parse(await readFile(found, "utf8").catch(() => "{}")) as {
+      version?: unknown;
+    };
     if (typeof parsed.version === "string") versions.set(name, parsed.version);
   }
   return versions;
@@ -338,7 +350,9 @@ async function cjsShimOf(options: {
   let keys: string[];
   try {
     // 求值才知道键：CJS 的导出面是**运行期**的（静态分析只能看到 `module.exports = require(…)`）。
-    const loaded = createRequire(options.entry)(options.entry) as Record<string, unknown> | undefined;
+    const loaded = createRequire(options.entry)(options.entry) as
+      | Record<string, unknown>
+      | undefined;
     keys = Object.keys(loaded ?? {});
   } catch {
     // 求值有副作用、或本来就是不能在 node 里加载的东西：宁可只有 default 导出，也不要让构建挂掉。
@@ -361,7 +375,9 @@ async function cjsShimOf(options: {
     ].join("\n"),
     "utf8",
   );
-  options.log?.(`[bundle-cjs] ${options.name}/${options.exportName}: 补 ${String(named.length)} 个具名导出\n`);
+  options.log?.(
+    `[bundle-cjs] ${options.name}/${options.exportName}: 补 ${String(named.length)} 个具名导出\n`,
+  );
   return file;
 }
 
@@ -479,9 +495,14 @@ async function withBuildSlot<T>(work: () => Promise<T>): Promise<T> {
 /** 排队中/在跑的包级构建（键是缓存目录名）。 */
 const building = new Map<string, Promise<Bundled | undefined>>();
 
-async function bundlePackageOnce(options: BundleOptions, key: string): Promise<Bundled | undefined> {
+async function bundlePackageOnce(
+  options: BundleOptions,
+  key: string,
+): Promise<Bundled | undefined> {
   const wanted = Object.keys(options.input);
-  options.log?.(`[bundle-in] ${options.name}: input=${wanted.join(",")} cache=${options.cacheRoot}\n`);
+  options.log?.(
+    `[bundle-in] ${options.name}: input=${wanted.join(",")} cache=${options.cacheRoot}\n`,
+  );
   if (wanted.length === 0) return undefined;
   const outDir = join(options.cacheRoot, key);
   const manifestPath = join(outDir, ".files.json");
@@ -599,13 +620,15 @@ async function bundlePackageOnce(options: BundleOptions, key: string): Promise<B
     assetFileNames: "assets/[name]-[hash][extname]",
     // 外置说明符 → 联邦地址（`/@client-modules/<pkg>@<ver>/…`）。
     paths: (id: string) =>
-        urlOf(id, {
-          versions: resolvable,
-          ...(options.clientRows === undefined ? {} : { clientRows: options.clientRows }),
-        }),
+      urlOf(id, {
+        versions: resolvable,
+        ...(options.clientRows === undefined ? {} : { clientRows: options.clientRows }),
+      }),
   });
   await bundle.close();
-  options.log?.(`[bundle-build] ${options.name}: rolldown done ms=${String(Date.now() - startedAt)}\n`);
+  options.log?.(
+    `[bundle-build] ${options.name}: rolldown done ms=${String(Date.now() - startedAt)}\n`,
+  );
 
   if (!items.some((item) => item.type === "chunk")) {
     options.log?.(
@@ -671,7 +694,13 @@ async function packageJsonNear(file: string): Promise<string> {
   let directory = dirname(file);
   for (;;) {
     const candidate = join(directory, "package.json");
-    if (await readFile(candidate, "utf8").then(() => true, () => false)) return candidate;
+    if (
+      await readFile(candidate, "utf8").then(
+        () => true,
+        () => false,
+      )
+    )
+      return candidate;
     const parent = dirname(directory);
     if (parent === directory) return candidate;
     directory = parent;

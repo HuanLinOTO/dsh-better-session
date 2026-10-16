@@ -117,12 +117,19 @@ export function desktopBuildConfig(input: DesktopBuildConfigInput): DesktopConfi
     afterPack: async (context) => {
       const resources =
         context.packager.platform.name === "mac"
-          ? join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents", "Resources")
+          ? join(
+              context.appOutDir,
+              `${context.packager.appInfo.productFilename}.app`,
+              "Contents",
+              "Resources",
+            )
           : join(context.appOutDir, "resources");
       // **工作区根**必须是真的 app 目录，不能拿 `context.packager.projectDir`：那是壳的装配目录
       // （`.dshdev/shell`），`pnpm deploy` 在那里写过一份 `pnpm-workspace.yaml`，于是它会被当成工作区根，
       // 而 lockfile 里的 `file:` 依赖在仓库内 → pnpm 以"路径在工作区之外"拒绝。
-      const name = (JSON.parse(await readFile(join(appWorkspace, "package.json"), "utf8")) as { name: string }).name;
+      const name = (
+        JSON.parse(await readFile(join(appWorkspace, "package.json"), "utf8")) as { name: string }
+      ).name;
       await deployClosure(appWorkspace, name, join(resources, "profile"));
     },
     mac: {
@@ -149,15 +156,15 @@ export async function buildDesktopApp(options: DesktopBuildOptions): Promise<str
   const appDir = await prepareShellAppDirectory(options);
   // 打包前把 app 目录摊开看一眼：electron-builder 只按 `files` 取件，缺件时从这里能立刻分辨"没装出来"
   // 还是"没打进去"。
-  log.info("shell.app %o", { "dir": appDir, "entries": await readdir(appDir) });
+  log.info("shell.app %o", { dir: appDir, entries: await readdir(appDir) });
   const distDir = join(appDir, "dist");
-  log.info("shell.dist %o", { "entries": await readdir(distDir).catch(() => ["(无 dist)"]) });
+  log.info("shell.dist %o", { entries: await readdir(distDir).catch(() => ["(无 dist)"]) });
   const electron = await installedElectron();
   log.info("builder %o", {
-    "appId": appConfig.id,
-    "productName": appConfig.displayName,
-    "version": appConfig.version,
-    "electron": electron.version,
+    appId: appConfig.id,
+    productName: appConfig.displayName,
+    version: appConfig.version,
+    electron: electron.version,
   });
   return build({
     projectDir: appDir,

@@ -12,12 +12,7 @@ export {
 export { packageExportsHook, type PackageExportsOptions } from "./package-exports.ts";
 export { prebundleDependency, type PrebundledDependency } from "./prebundle.ts";
 export { standardDecoratorsPlugin, type StandardDecoratorsOptions } from "./standard-decorators.ts";
-export {
-  compileCssModule,
-  compileGlobalCss,
-  compileStyleModule,
-  cssInlinePlugins,
-} from "./css.ts";
+export { compileCssModule, compileGlobalCss, compileStyleModule, cssInlinePlugins } from "./css.ts";
 export {
   bundleClientFactory,
   bundleClientLibrary,
@@ -30,4 +25,8 @@ export {
   INLINE_SAFE,
   isClientExternal,
 } from "./cordis-client.ts";
-export type { ClientBundleSpec, ClientFactoryOptions, CordisClientOptions } from "./cordis-client.ts";
+export type {
+  ClientBundleSpec,
+  ClientFactoryOptions,
+  CordisClientOptions,
+} from "./cordis-client.ts";

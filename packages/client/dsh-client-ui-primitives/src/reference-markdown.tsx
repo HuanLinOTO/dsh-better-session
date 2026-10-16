@@ -14,11 +14,7 @@
 
 import { memo, useMemo } from "react";
 import { MarkdownText } from "./markdown-text.ts";
-import type {
-  MarkdownFileMentions,
-  MarkdownLabels,
-  MarkdownPathImages,
-} from "./markdown-text.ts";
+import type { MarkdownFileMentions, MarkdownLabels, MarkdownPathImages } from "./markdown-text.ts";
 import {
   findReferences,
   formatReference,

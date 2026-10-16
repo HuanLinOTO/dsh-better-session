@@ -12,11 +12,7 @@ import { describe, expect, it } from "vitest";
 import { ConfigForms } from "@deepseek-ai/dsh-client-ui-settings/src/client/config-form.ts";
 import { SettingsDescribeMirror } from "@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts";
 import { SettingsSchemaService } from "@deepseek-ai/dsh-client-ui-settings/src/client/schema.ts";
-import {
-  plainConfig,
-  projectForm,
-  volatileForm,
-} from "@deepseek-ai/dsh-settings/src/schema.ts";
+import { plainConfig, projectForm, volatileForm } from "@deepseek-ai/dsh-settings/src/schema.ts";
 import { SchemaFormHints } from "@morlay/dsh-client-ui-primitives";
 import {
   createBundleConfigFace,

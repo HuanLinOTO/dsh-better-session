@@ -10,13 +10,7 @@ import {
   rerollPlan,
   retryableTurns,
 } from "../plan.ts";
-import {
-  assistantMessage,
-  oneTurnLog,
-  turnLog,
-  twoTurnLog,
-  userMessage,
-} from "../testing.ts";
+import { assistantMessage, oneTurnLog, turnLog, twoTurnLog, userMessage } from "../testing.ts";
 
 function emptyTurn(base: number, turn: number): SessionEvent[] {
   return [

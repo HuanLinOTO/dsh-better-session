@@ -64,6 +64,9 @@ describe("chat-node 的槽注册面", () => {
       expect(entry.children).toBeUndefined();
     }
     // 我们没有把那个槽的声明权抢过来（抢了上游工厂就注册不上了）。
-    expect(core.spec("conversation.chat.user.images")).toMatchObject({ kind: "single", scope: "session" });
+    expect(core.spec("conversation.chat.user.images")).toMatchObject({
+      kind: "single",
+      scope: "session",
+    });
   });
 });

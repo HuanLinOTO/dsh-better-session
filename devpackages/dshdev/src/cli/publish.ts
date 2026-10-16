@@ -23,7 +23,10 @@ export function distTagOf(version: string): string {
 }
 
 // 捕获 stdout/stderr 地跑子进程：非零退出不抛，交给调用方按退出码判断。
-async function capture(command: string, args: string[]): Promise<{ status: number | null; stderr: string }> {
+async function capture(
+  command: string,
+  args: string[],
+): Promise<{ status: number | null; stderr: string }> {
   try {
     const { stderr } = await execFileAsync(command, args, { encoding: "utf8" });
     return { status: 0, stderr };
@@ -67,12 +70,23 @@ export async function runPublish(options: {
     return 0;
   }
 
-  const view = await capture("pnpm", ["view", `${name}@${version}`, "version", "--registry", registry]);
+  const view = await capture("pnpm", [
+    "view",
+    `${name}@${version}`,
+    "version",
+    "--registry",
+    registry,
+  ]);
   if (view.status === 0) {
     log.info(`skip ${name}: ${version} already published`);
     return 0;
   }
-  if (!(view.stderr.includes("ERR_PNPM_PACKAGE_NOT_FOUND") || view.stderr.includes("ERR_PNPM_FETCH_404"))) {
+  if (
+    !(
+      view.stderr.includes("ERR_PNPM_PACKAGE_NOT_FOUND") ||
+      view.stderr.includes("ERR_PNPM_FETCH_404")
+    )
+  ) {
     process.stderr.write(view.stderr);
     return 1;
   }

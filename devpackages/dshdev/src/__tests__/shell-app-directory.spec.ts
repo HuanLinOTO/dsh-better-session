@@ -40,7 +40,10 @@ describe("prepareShellAppDirectory", () => {
     // appRoot 现在是 `prepareShell` 装配出来的目录（引导 + 转译后的 dist + 清单 + 本地化）：
     // 这里只补 `pnpm-workspace.yaml`（让 electron-builder 的包遍历停在工作目录），**不再重新装配**。
     const appDir = await workDir();
-    await writeFile(join(appDir, "package.json"), `${JSON.stringify({ main: "./bootstrap.mjs" })}\n`);
+    await writeFile(
+      join(appDir, "package.json"),
+      `${JSON.stringify({ main: "./bootstrap.mjs" })}\n`,
+    );
     await writeFile(join(appDir, "bootstrap.mjs"), "export {};\n");
     await mkdir(join(appDir, "dist"), { recursive: true });
     await writeFile(join(appDir, "dist", "index.mjs"), "export {};\n");

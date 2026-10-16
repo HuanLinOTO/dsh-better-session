@@ -1,4 +1,4 @@
-import type { ChatConversationViewNode } from './chat-nodes.ts'
+import type { ChatConversationViewNode } from "./chat-nodes.ts";
 
 /**
  * Chat group-tree positions from the outermost inward; a Node at a position
@@ -22,9 +22,14 @@ import type { ChatConversationViewNode } from './chat-nodes.ts'
  * `answerStep`), not from a position, because which step answers changes as
  * later steps arrive.
  */
-export type ChatGroupTree = 'exchange' | 'input' | 'turn' | 'process'
+export type ChatGroupTree = "exchange" | "input" | "turn" | "process";
 
-const DEPTH: Readonly<Record<ChatGroupTree, number>> = { exchange: 0, input: 1, turn: 2, process: 3 }
+const DEPTH: Readonly<Record<ChatGroupTree, number>> = {
+  exchange: 0,
+  input: 1,
+  turn: 2,
+  process: 3,
+};
 
 /**
  * Test whether a Node stands at a group-tree position or outside it.
@@ -32,6 +37,9 @@ const DEPTH: Readonly<Record<ChatGroupTree, number>> = { exchange: 0, input: 1, 
  * @param position - group-tree position to compare against.
  * @returns whether the Node's position is `position` or an outer one.
  */
-export function isAtOrOutside(node: Pick<ChatConversationViewNode, 'groupTree'>, position: ChatGroupTree): boolean {
-  return node.groupTree !== undefined && DEPTH[node.groupTree] <= DEPTH[position]
+export function isAtOrOutside(
+  node: Pick<ChatConversationViewNode, "groupTree">,
+  position: ChatGroupTree,
+): boolean {
+  return node.groupTree !== undefined && DEPTH[node.groupTree] <= DEPTH[position];
 }

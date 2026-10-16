@@ -148,8 +148,8 @@ async function installApp(workspace: string, appConfig: AppConfig): Promise<void
     await writeFile(plan.desktopEntry.path, plan.desktopEntry.contents);
   }
   log.info("install %o", {
-    "target": plan.target,
-    "desktopEntry": plan.desktopEntry,
+    target: plan.target,
+    desktopEntry: plan.desktopEntry,
   });
 }
 
@@ -169,7 +169,7 @@ export async function runBundle(options: BundleOptions): Promise<void> {
   };
 
   log.info("bundle %o", {
-    "workspace": workspace,
+    workspace: workspace,
     "app.name": appConfig.displayName,
     "app.version": appConfig.version,
   });
@@ -191,6 +191,6 @@ export async function runBundle(options: BundleOptions): Promise<void> {
     icons,
     dir: options.dir,
   });
-  log.info("artifacts %o", { "dir": join(buildCacheDir, "artifacts") });
+  log.info("artifacts %o", { dir: join(buildCacheDir, "artifacts") });
   if (options.install) await installApp(workspace, appConfig);
 }

@@ -22,10 +22,7 @@ import { SchemaForm } from "../schema-form/SchemaForm.tsx";
 import { projectNode, walkFields, type FieldNode } from "../schema-form/schema-node.ts";
 import { fakeDescribe } from "../schema-form/testing/fake-describe.ts";
 import { FakeScope } from "../schema-form/testing/fake-scope.ts";
-import {
-  notifyResize,
-  stubResizeObserver,
-} from "../schema-form/testing/resize-observer-stub.ts";
+import { notifyResize, stubResizeObserver } from "../schema-form/testing/resize-observer-stub.ts";
 import type {
   SchemaFieldOwnerProps,
   SchemaFormComponentProps,

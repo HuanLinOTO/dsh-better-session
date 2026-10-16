@@ -34,7 +34,9 @@ function rowsOf(source: RowsSource): Promise<Map<string, string>> {
 export const HMR_PATH = "/__dsh_hmr";
 
 /** vite 期望的 http server 类型（`server.hmr.server`）：HMR 的 WebSocket 挂在它的 `upgrade` 上。 */
-type HmrServer = NonNullable<Extract<NonNullable<ServerOptions["hmr"]>, { server?: unknown }>["server"]>;
+type HmrServer = NonNullable<
+  Extract<NonNullable<ServerOptions["hmr"]>, { server?: unknown }>["server"]
+>;
 
 export interface ViteHandoff {
   /** 有没有挂 HMR（无端口形态没有同源的 http server 可挂，见 `hmr: false`）——页面决定要不要注入客户端。 */
@@ -72,7 +74,8 @@ export async function startViteDev(
   /** 页面所在的端口（HMR 的 WebSocket 必须与页面**同源同端口**，否则客户端连不上）。 */
   const pagePort = ((): number | undefined => {
     const address = options.httpServer?.address();
-    if (address !== null && address !== undefined && typeof address === "object") return address.port;
+    if (address !== null && address !== undefined && typeof address === "object")
+      return address.port;
     const fromEnv = process.env["PORT"];
     return fromEnv === undefined ? undefined : Number(fromEnv);
   })();
@@ -181,7 +184,7 @@ export async function startViteDev(
         if (res.statusCode < 400) return;
         trace("%s %s → %s", req.method ?? "", req.url ?? "", res.statusCode);
       });
-      ;(current ?? server).middlewares(req, res, () => {
+      (current ?? server).middlewares(req, res, () => {
         // vite 没接住：留下线索（桌面形态经自定义协议进来，请求形态与 http 不同，这条日志能立刻定位）。
         trace("miss %s %s", req.method ?? "", req.url ?? "");
         if (!res.headersSent) res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });

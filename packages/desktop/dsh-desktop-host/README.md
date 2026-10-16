@@ -17,6 +17,7 @@
   ```
 
   `--profile-dir` 是 profile root（打包形态是种子种出的 `$DSH_HOME/profiles/<name>`，dev 形态是 app 目录本身）；
+
 - **入口只做三件事**：[`src/index.ts`](./src/index.ts) 解析参数 → 装配 → 接线；装配在
   [`@morlay/dsh-app-boot`](../../boot/dsh-app-boot/README.md)（desktop 与 web 共用，层完全由 profile 的
   `dsh.profile.bundles` 决定），管道与请求分发在 [`src/desktop-ipc.ts`](./src/desktop-ipc.ts)，传输接管在

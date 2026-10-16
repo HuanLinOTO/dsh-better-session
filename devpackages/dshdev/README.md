@@ -9,12 +9,12 @@
 
 ## 用法
 
-| 命令                                                     | 作用                                                                              |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `dshdev web [--data-dir <spec>] [--prod] [workspace]` | 在浏览器里跑 `dsh web`（页面与资源走宿主自己的 http 端口） |
-| `dshdev desktop [--data-dir <spec>] [--prod] [workspace]` | 启动 Electron 壳（不打包） |
-| `dshdev desktop bundle [--dir] [--install] [workspace]` | 构建当前平台的静态、无签名桌面应用 |
-| `dshdev check-deps [package]` | 从一个包的入口扫出它运行期 import 的包，报**没在自己清单里声明**的那些（非零退出） |
+| 命令                                                      | 作用                                                                               |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `dshdev web [--data-dir <spec>] [--prod] [workspace]`     | 在浏览器里跑 `dsh web`（页面与资源走宿主自己的 http 端口）                         |
+| `dshdev desktop [--data-dir <spec>] [--prod] [workspace]` | 启动 Electron 壳（不打包）                                                         |
+| `dshdev desktop bundle [--dir] [--install] [workspace]`   | 构建当前平台的静态、无签名桌面应用                                                 |
+| `dshdev check-deps [package]`                             | 从一个包的入口扫出它运行期 import 的包，报**没在自己清单里声明**的那些（非零退出） |
 
 `--prod`：起之前先装配**打包形态的解析面**（`pnpm deploy` 的闭包，deploy 目录同时当 profile 与 runtime），
 再让 web 跑在它上面，于是不必等一轮打包就能验证打包形态的问题（闭包缺依赖、清单不对）。`--prod` 下前端装配在

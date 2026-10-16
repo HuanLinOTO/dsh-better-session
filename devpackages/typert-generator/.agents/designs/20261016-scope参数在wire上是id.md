@@ -21,7 +21,7 @@ list(agent: Agent): readonly CommandDescriptor[]
 
 1. **descriptor 的 `wire`**：取查找表的 key（`scopeHit.wire`），不要拿参数名兜底。上游的写法是
    ```ts
-   wire: `${lookup.key}Id`            // analyzer.ts
+   wire: `${lookup.key}Id`; // analyzer.ts
    ```
 2. **客户端参数的 schema**：按 **id 的类型**生成（`SessionId` → `z.string()`），**不能**按参数节点声明的
    宿主对象类型生成（`Agent` → `z.object({ id: … })`）。后者会让客户端发对象、服务端按字符串 `parse`，

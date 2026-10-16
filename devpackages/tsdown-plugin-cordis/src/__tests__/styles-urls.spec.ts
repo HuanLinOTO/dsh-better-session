@@ -47,10 +47,15 @@ describe("样式里的 url() 处理", () => {
 
   it("超过阈值的大图走 emit（落到资产），URL 换成给回来的那个", async () => {
     const emitted: string[] = [];
-    const out = await rewriteCssUrls(CSS, join(directory, "styles.css"), "threshold", (name, bytes) => {
-      emitted.push(`${name}:${String(bytes.byteLength)}`);
-      return `/@client-modules/demo@1.0.0/assets/${name}`;
-    });
+    const out = await rewriteCssUrls(
+      CSS,
+      join(directory, "styles.css"),
+      "threshold",
+      (name, bytes) => {
+        emitted.push(`${name}:${String(bytes.byteLength)}`);
+        return `/@client-modules/demo@1.0.0/assets/${name}`;
+      },
+    );
 
     expect(emitted).toContain("running-whale.png:5000");
     expect(out).toContain("/@client-modules/demo@1.0.0/assets/running-whale.png");

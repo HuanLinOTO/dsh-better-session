@@ -13,10 +13,7 @@ import { isMultiline } from "../schema-form/value.tsx";
 import { zh } from "../schema-form/locales.ts";
 import { projectNode, type FieldNode } from "../schema-form/schema-node.ts";
 import { stubResizeObserver } from "../schema-form/testing/resize-observer-stub.ts";
-import type {
-  SchemaFieldOwnerProps,
-  SchemaFormTranslate,
-} from "../schema-form/slot-contract.ts";
+import type { SchemaFieldOwnerProps, SchemaFormTranslate } from "../schema-form/slot-contract.ts";
 import {
   InlineValue,
   SchemaFieldDefault,

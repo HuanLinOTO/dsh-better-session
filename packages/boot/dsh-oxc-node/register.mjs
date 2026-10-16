@@ -70,7 +70,8 @@ registerHooks({
       },
     );
     // `map` 可能是字符串，也可能是 sourcemap 对象——两种都要能带上（栈里才指向原文件）。
-    const map = result.map === undefined || result.map === null ? undefined : JSON.stringify(result.map);
+    const map =
+      result.map === undefined || result.map === null ? undefined : JSON.stringify(result.map);
     return {
       format,
       source:

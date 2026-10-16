@@ -53,8 +53,7 @@ export const patch: Step[] = [
     // 要求每个 export 解析到**存在的**源文件，未映射的出口会让生成失败。
     explicit: {
       "@deepseek-ai/dsh-app-boot": {
-        "./worker/profile-resolution-bootstrap":
-          "./src/profile-resolution/worker-bootstrap.ts",
+        "./worker/profile-resolution-bootstrap": "./src/profile-resolution/worker-bootstrap.ts",
       },
       "@deepseek-ai/dsh-client-ui-theme": {
         "./brand-font.css": "./src/styles/brand-font.css",

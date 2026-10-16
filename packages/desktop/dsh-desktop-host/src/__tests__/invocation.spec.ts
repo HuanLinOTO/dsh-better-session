@@ -50,9 +50,9 @@ describe("宿主入口的参数（desktop / web 共用）", () => {
     expect(() => parseHostInvocation("dsh desktop", ["--profile-dir", "/app"])).toThrow(
       /--runtime-dir/u,
     );
-    expect(() => parseHostInvocation("dsh desktop", ["--profile-dir", "/app", "--runtime-dir"])).toThrow(
-      /needs a value/u,
-    );
+    expect(() =>
+      parseHostInvocation("dsh desktop", ["--profile-dir", "/app", "--runtime-dir"]),
+    ).toThrow(/needs a value/u);
     expect(() => parseHostInvocation("dsh web", ["--nope"])).toThrow(
       /dsh web: unknown argument "--nope"/u,
     );

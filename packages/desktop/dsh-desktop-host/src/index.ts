@@ -96,15 +96,12 @@ async function main(): Promise<void> {
   const ipc = connectDesktopIpc({ application });
 
   const gateway = ctx.get("typertGateway");
-  ctx.logger.info(
-    "transport ready %o",
-    {
-      // 结构化字段：键名 `.` 分层、不带空格；值作为参数传（不走 `key=value` 文本）。
-      "webServer": webServer.constructor.name,
-      "gateway": gateway === undefined ? "missing" : "present",
-      "streamRoute": DESKTOP_STREAM_PATH,
-    },
-  );
+  ctx.logger.info("transport ready %o", {
+    // 结构化字段：键名 `.` 分层、不带空格；值作为参数传（不走 `key=value` 文本）。
+    webServer: webServer.constructor.name,
+    gateway: gateway === undefined ? "missing" : "present",
+    streamRoute: DESKTOP_STREAM_PATH,
+  });
   ipc.send({
     type: "ready",
     protocolVersion: DESKTOP_HOST_PROTOCOL_VERSION,

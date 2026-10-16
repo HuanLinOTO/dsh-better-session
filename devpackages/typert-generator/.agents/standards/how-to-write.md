@@ -7,12 +7,12 @@
 
 生成器的规则按面分在四份文件里，新增一条规则时改对应的那一份，别把语法活散到别处：
 
-| 规则                                                         | 位置                                       |
-| ------------------------------------------------------------ | ------------------------------------------ |
-| 类型语法 → zod（15 种形式、修饰符、递归 `z.lazy`）           | [`src/schema.ts`](../../src/schema.ts)     |
-| 方法面与产物文本（命名、格式、`cancellation`、`typeSymbol`） | [`src/index.ts`](../../src/index.ts)       |
+| 规则                                                         | 位置                                           |
+| ------------------------------------------------------------ | ---------------------------------------------- |
+| 类型语法 → zod（15 种形式、修饰符、递归 `z.lazy`）           | [`src/schema.ts`](../../src/schema.ts)         |
+| 方法面与产物文本（命名、格式、`cancellation`、`typeSymbol`） | [`src/index.ts`](../../src/index.ts)           |
 | 包反射（JSDoc → description / summary / tags、成员签名）     | [`src/reflection.ts`](../../src/reflection.ts) |
-| AST 机械活（解析、遍历、JSDoc、位置）                        | [`src/ast.ts`](../../src/ast.ts)           |
+| AST 机械活（解析、遍历、JSDoc、位置）                        | [`src/ast.ts`](../../src/ast.ts)               |
 
 ## 两条边界
 

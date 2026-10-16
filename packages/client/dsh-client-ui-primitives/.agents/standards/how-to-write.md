@@ -44,4 +44,3 @@
 - **照抄上游的 token 引用**：官方那张卡的 hover 底色引用 `--dsw-alias-bg-layer-4`、失败文案引用
   `--dsw-alias-label-error`，两个都**不在**官方主题的定义集里（`theme.generated.ts` 里没有它们）。照抄引用、
   不换近义 token、也不加 fallback——官方主题哪天定义它们，这里自动跟着生效、视觉与上游逐帧一致。
-

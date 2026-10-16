@@ -57,7 +57,9 @@ async function bareSpecifiersOf(file: string): Promise<string[]> {
       found.push(source);
     }
     if (record["type"] === "CallExpression") {
-      const callee = record["callee"] as { name?: unknown; property?: { name?: unknown } } | undefined;
+      const callee = record["callee"] as
+        | { name?: unknown; property?: { name?: unknown } }
+        | undefined;
       const first = (record["arguments"] as { value?: unknown }[] | undefined)?.[0];
       // `require("x")` 与 `import.meta.resolve("x")`：后者长成 `(<import.meta>).resolve(...)`。
       if (
@@ -105,7 +107,9 @@ export async function runtimeDependenciesOf(root: string): Promise<RuntimeDepend
       if (!seen.has(name)) seen.set(name, relative(root, file));
     }
   }
-  return [...seen].map(([name, from]) => ({ name, from })).sort((a, b) => a.name.localeCompare(b.name));
+  return [...seen]
+    .map(([name, from]) => ({ name, from }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -122,7 +126,9 @@ export async function runtimeDependenciesOf(root: string): Promise<RuntimeDepend
  * @returns 未声明的依赖名（按扫出来的顺序）。
  */
 export function undeclaredDependencies(
-  manifest: { dependencies?: Record<string, string>; peerDependencies?: Record<string, string> } | undefined,
+  manifest:
+    | { dependencies?: Record<string, string>; peerDependencies?: Record<string, string> }
+    | undefined,
   dependencies: readonly RuntimeDependency[],
 ): string[] {
   const declared = new Set<string>([
@@ -136,7 +142,11 @@ export function undeclaredDependencies(
 export async function reportRuntimeDependencies(root: string): Promise<string[]> {
   const dependencies = await runtimeDependenciesOf(root);
   const manifest = await readFile(join(root, "package.json"), "utf8").then(
-    (text) => JSON.parse(text) as { dependencies?: Record<string, string>; peerDependencies?: Record<string, string> },
+    (text) =>
+      JSON.parse(text) as {
+        dependencies?: Record<string, string>;
+        peerDependencies?: Record<string, string>;
+      },
     () => undefined,
   );
   const missing = undeclaredDependencies(manifest, dependencies);

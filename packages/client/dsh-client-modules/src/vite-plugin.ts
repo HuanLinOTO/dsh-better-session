@@ -52,7 +52,13 @@ export interface ClientRowsPluginOptions {
 async function packageRootOfFile(file: string): Promise<string | undefined> {
   let directory = dirname(file);
   for (;;) {
-    if (await readFile(join(directory, "package.json"), "utf8").then(() => true, () => false)) return directory;
+    if (
+      await readFile(join(directory, "package.json"), "utf8").then(
+        () => true,
+        () => false,
+      )
+    )
+      return directory;
     const parent = dirname(directory);
     if (parent === directory) return undefined;
     directory = parent;
@@ -81,7 +87,12 @@ async function clientVariantOf(source: string, importer: string): Promise<string
   const relativeFromSrc = relative(packageSrc, target);
   if (relativeFromSrc.startsWith("..")) return undefined;
   const variant = join(packageSrc, "client", relativeFromSrc);
-  return (await readFile(variant, "utf8").then(() => true, () => false)) ? variant : undefined;
+  return (await readFile(variant, "utf8").then(
+    () => true,
+    () => false,
+  ))
+    ? variant
+    : undefined;
 }
 
 export function dshClientRowsPlugin(options: ClientRowsPluginOptions): Plugin {
@@ -115,7 +126,8 @@ export function dshClientRowsPlugin(options: ClientRowsPluginOptions): Plugin {
       // 联邦地址：由我们自己那条链服务（按请求预编译 + 落盘缓存），vite 只把它当**外部**留着。
       // `external: "absolute"` 而不是 `true`：这是以 `/` 开头的地址，vite 的预转换会把它当仓库文件去加载
       // （日志里一串 `Failed to load url /@client-modules/…` 就是它）。
-      if (source.startsWith(`${CLIENT_MODULES_PREFIX}/`)) return { id: source, external: "absolute" };
+      if (source.startsWith(`${CLIENT_MODULES_PREFIX}/`))
+        return { id: source, external: "absolute" };
       // 聚合产物的 URL：它由 `dsh-client-modules` 自己的路由服务（按包预编译 + 落盘缓存），
       // vite 只该把它当外部地址保留在 import 里，不要试图去读文件。
       // 对外形态的 URL → 源码文件（vite 只认文件路径与它自己的虚拟 id）。
@@ -177,7 +189,9 @@ export function dshClientRowsPlugin(options: ClientRowsPluginOptions): Plugin {
       if (known !== undefined && known !== source) return known;
       // **行包 + 子路径**（`@deepseek-ai/dsh-client-ui-theme/brand-font.css` 这种）：包在 vendor 下、root 的
       // node_modules 里没有，vite 自己解析不到；用行的包根 + 清单的 `exports` 落文件（标准 exports 语义）。
-      const slash = source.startsWith("@") ? source.indexOf("/", source.indexOf("/") + 1) : source.indexOf("/");
+      const slash = source.startsWith("@")
+        ? source.indexOf("/", source.indexOf("/") + 1)
+        : source.indexOf("/");
       if (slash > 0) {
         const pkgName = source.slice(0, slash);
         const subpath = source.slice(slash + 1);
@@ -211,8 +225,7 @@ export function dshClientRowsPlugin(options: ClientRowsPluginOptions): Plugin {
         // 虚拟模块里写**包名**会被 `vite:import-analysis` 当成依赖去解析（importer 记成根 `package.json`），
         // 落到工作区解析面上就是 `Cannot find package '@deepseek-ai/dsh-typert-registry' …`——上游 workspace
         // 内部包只存在于 vendor 与闭包里。写地址则只是"一个外部 URL"，vite 不会去碰它。
-        const specifier =
-          file === pkg ? ((await options.depsUrl?.(pkg)) ?? file) : file;
+        const specifier = file === pkg ? ((await options.depsUrl?.(pkg)) ?? file) : file;
         imports.push(`import * as ${alias} from ${JSON.stringify(specifier)};`);
         entries.push(`  { id: ${JSON.stringify(pkg)}, module: ${alias} },`);
         index += 1;

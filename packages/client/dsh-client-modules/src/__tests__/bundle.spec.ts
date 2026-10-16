@@ -33,7 +33,12 @@ test("地址带 `?v=`（构建世代；与 vite 同名的参数）", () => {
 });
 
 test("子路径引用保留子路径；扩展名与产物一致（没有扩展名的补 `.js`，有的原样）", () => {
-  const tables = { versions: new Map([["@oxc-project/runtime", "0.153.0"], ["katex", "0.16.47"]]) };
+  const tables = {
+    versions: new Map([
+      ["@oxc-project/runtime", "0.153.0"],
+      ["katex", "0.16.47"],
+    ]),
+  };
   // 产物名一律 `<出口名>.js`（`entryFileNames`），所以没扩展名的子路径要补上——不然一半 URL 带、一半不带。
   expect(urlOf("@oxc-project/runtime/helpers/decorate", tables)).toBe(
     `/@client-modules/@oxc-project+runtime@0.153.0/helpers/decorate.js?v=${BUNDLER_REV}`,
@@ -87,7 +92,10 @@ function options(exportName: string): Parameters<typeof bundlePackage>[0] {
   return {
     cacheRoot,
     repoRoot: work,
-    alias: clientModulesAlias({ repoRoot, nodeStub: join(repoRoot, "packages/client/dsh-client-modules/app-boot/node-stub.cjs") }),
+    alias: clientModulesAlias({
+      repoRoot,
+      nodeStub: join(repoRoot, "packages/client/dsh-client-modules/app-boot/node-stub.cjs"),
+    }),
     name: "fixture",
     version: "1.0.0",
     input: { [exportName]: join(packageRoot, "src", `${exportName}.ts`) },

@@ -38,7 +38,8 @@ describe("buildCordisConfig", () => {
   });
 
   it("发布线按标准装饰器语义产出", () => {
-    const inputOptions = typeof config.inputOptions === "function" ? undefined : config.inputOptions;
+    const inputOptions =
+      typeof config.inputOptions === "function" ? undefined : config.inputOptions;
     expect(inputOptions?.transform).toEqual({ decorator: { legacy: false } });
   });
 });

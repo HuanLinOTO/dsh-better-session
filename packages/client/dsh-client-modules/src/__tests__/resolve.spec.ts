@@ -11,7 +11,11 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { exportTargetOf, fileInPackage, packageRootOf } from "../resolve.ts";
 
 /** 造一个包（清单 + 文件），用来测"清单说了什么"这一类判断。 */
-async function makePackage(root: string, manifest: unknown, files: Record<string, string>): Promise<void> {
+async function makePackage(
+  root: string,
+  manifest: unknown,
+  files: Record<string, string>,
+): Promise<void> {
   await mkdir(root, { recursive: true });
   await writeFile(join(root, "package.json"), JSON.stringify(manifest, null, 2), "utf8");
   for (const [path, content] of Object.entries(files)) {
@@ -41,12 +45,19 @@ describe("exportTargetOf", () => {
         version: "1.0.0",
         exports: {
           "./helpers/decorate": [
-            { node: "./src/helpers/decorate.js", import: "./src/helpers/esm/decorate.js", default: "./src/helpers/decorate.js" },
+            {
+              node: "./src/helpers/decorate.js",
+              import: "./src/helpers/esm/decorate.js",
+              default: "./src/helpers/decorate.js",
+            },
             "./src/helpers/decorate.js",
           ],
         },
       },
-      { "src/helpers/esm/decorate.js": "export default 1;\n", "src/helpers/decorate.js": "module.exports = 1;\n" },
+      {
+        "src/helpers/esm/decorate.js": "export default 1;\n",
+        "src/helpers/decorate.js": "module.exports = 1;\n",
+      },
     );
     await expect(exportTargetOf(root, "helpers/decorate")).resolves.toBe(
       join(root, "src/helpers/esm/decorate.js"),
@@ -87,10 +98,14 @@ describe("fileInPackage", () => {
 
   test("清单没覆盖的子路径按物理路径找（`picomatch/posix` 就是 `posix.js`）", async () => {
     const root = join(work, "no-exports");
-    await makePackage(root, { name: "no-exports", version: "1.0.0", main: "index.js" }, {
-      "index.js": "module.exports = 1;\n",
-      "posix.js": "module.exports = 2;\n",
-    });
+    await makePackage(
+      root,
+      { name: "no-exports", version: "1.0.0", main: "index.js" },
+      {
+        "index.js": "module.exports = 1;\n",
+        "posix.js": "module.exports = 2;\n",
+      },
+    );
     await expect(fileInPackage(root, "posix")).resolves.toBe(join(root, "posix.js"));
   });
 

@@ -7,7 +7,9 @@ import { cordisPlugin } from "@local/tsdown-plugin-cordis";
 // 在 `ui-conversation-message-actions` 的 `.agents/adrs/`）——那份包同时带 client 样式层与 React 渲染，所以这里
 // 把用到的解析实现**内联进产物**，发布清单里不出现它。
 export default defineConfig({
-  plugins: [cordisPlugin({
-  inline: ["@morlay/dsh-client-ui-primitives"],
-})],
+  plugins: [
+    cordisPlugin({
+      inline: ["@morlay/dsh-client-ui-primitives"],
+    }),
+  ],
 });

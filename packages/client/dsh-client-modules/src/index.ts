@@ -46,7 +46,6 @@ export const name = "client-modules";
 
 export const inject = ["loader", "webServer"];
 
-
 // 打包器（`@local/devkit` 的现场打包面，连带 rolldown 与它的原生绑定）按需加载：打包产物里的行
 // 已经切成 dist，这一支一次都不会走——常驻它等于给每个宿主进程白加一份打包器的内存。
 interface RouteHost {
@@ -57,7 +56,9 @@ interface RouteHost {
     path: string;
     handler: (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
   }): () => void;
-  registerFallback(handler: (req: IncomingMessage, res: ServerResponse) => Promise<void> | void): () => void;
+  registerFallback(
+    handler: (req: IncomingMessage, res: ServerResponse) => Promise<void> | void,
+  ): () => void;
   register(route: {
     // `prefix` 匹配 `p` 与 `p/<anything>`（上游 webServer 的原生能力）：按文件寻址要用它。
     kind: "exact" | "prefix";
@@ -65,7 +66,6 @@ interface RouteHost {
     handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
   }): () => void;
 }
-
 
 /** cordis Loader 条目里我们用到的那几项（上游 `client-modules` 用同样几个字段判断行）。 */
 interface LoaderEntry {
@@ -122,16 +122,14 @@ async function clientRowsOf(loader: { entries(): Generator<LoaderEntry> }): Prom
     // 引用被重写成它的 deps 产物（一次构建、共享 chunk、落盘缓存、按内容 hash 失效）。
     found.set(name, {
       id: name,
-      clientPath: `@/${relative(await resolutionRoot(), clientPath).split(sep).join("/")}`,
+      clientPath: `@/${relative(await resolutionRoot(), clientPath)
+        .split(sep)
+        .join("/")}`,
       version: manifest.version,
     });
   }
   return [...found.values()];
 }
-
-
-
-
 
 /** 打包器指纹的输入集：**只与包有关、与出口无关**（缓存按包聚合，rev 跟着出口变就等于永不命中）。 */
 function watchOf(root: string | undefined, entry: string): string[] {
@@ -152,7 +150,9 @@ export function apply(ctx: Context): void {
   const logFileOf = dataDir().then((dir) => join(dir, "logs", "dev-host.log"));
   // 与上面同一个事实的同步镜像：`onExit` 回调不能 await，只能读已经落定的那一份。
   let resolvedLogFile: string | undefined;
-  void logFileOf.then((file) => { resolvedLogFile = file; });
+  void logFileOf.then((file) => {
+    resolvedLogFile = file;
+  });
 
   // **宿主进程的异常要留下痕迹**：dev 形态下 vite 跑在同一个进程里（它的原生绑定或某个未捕获异常崩过一次，
   // 外部只看到连接被拒，无从溯源）。落一份日志到数据根的 `logs/dev-host.log`，退出时在 stderr 指路。
@@ -170,7 +170,9 @@ export function apply(ctx: Context): void {
       void appendLog(`[uncaughtException] ${error.stack ?? error.message}`);
     };
     const onRejection = (reason: unknown): void => {
-      void appendLog(`[unhandledRejection] ${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}`);
+      void appendLog(
+        `[unhandledRejection] ${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}`,
+      );
     };
     const onExit = (code: number): void => {
       // 退出回调是同步的（不能 await）：日志路径在退出前早已解析好，直接取缓存值。
@@ -191,7 +193,8 @@ export function apply(ctx: Context): void {
   // `ctx.loader` 是 cordis 的服务（属性访问，别用 `ctx.get`——那给的是追踪代理）；上游 `hmr` 也是这么用的。
   const loader = ctx.loader;
   let excludedCache: RegExp[] | undefined;
-  const excludedOf = async (): Promise<RegExp[]> => (excludedCache ??= await devExcluded(await profileDir()));
+  const excludedOf = async (): Promise<RegExp[]> =>
+    (excludedCache ??= await devExcluded(await profileDir()));
   const sourceRowsOf = async (): Promise<ClientRow[]> => {
     rowsCache ??= loader === undefined ? [] : await clientRowsOf(loader);
     return rowsCache;
@@ -200,8 +203,7 @@ export function apply(ctx: Context): void {
   // 由解析规则在那一次 resolve 里判（能解析到 + 被点名 → 联邦），地址也由同一份出口表（`urlOf`）算——
   // 在这里写死 URL 就等于把"地址长什么样"抄成两份。没被点名的行仍是源码路径（改它要 HMR）。
   const rows = async (): Promise<ClientRow[]> => await sourceRowsOf();
-  if (webServer === undefined)
-    throw new Error("client-modules: webServer is a required service");
+  if (webServer === undefined) throw new Error("client-modules: webServer is a required service");
 
   // 包名 → 包根：交给 node 的解析（`createRequire(from).resolve`），不自己扫目录。
   // 基准是**发起引用的那个文件**——node 的规则就是这样，pnpm 的 node_modules 也按依赖关系摆好了。
@@ -228,8 +230,10 @@ export function apply(ctx: Context): void {
     return undefined;
   };
 
-
-  /** 兜底：vite 不认的路径直接 404（dev 形态下页面与资源全归它）。 */  const fallback = async (_req: IncomingMessage, res: ServerResponse): Promise<void> => {
+  /** 兜底：vite 不认的路径直接 404（dev 形态下页面与资源全归它）。 */ const fallback = async (
+    _req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> => {
     res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
     res.end("client-modules: 没有这条路由\n");
   };
@@ -271,12 +275,13 @@ export function apply(ctx: Context): void {
         depsUrl: (specifier: string, importer?: string) => depsUrlOfSpecifier(specifier, importer),
         // 同源的 http server：web 形态是宿主自己的端口；桌面形态是宿主**进程内**的回环端点
         // （`desktopUpgradeServer`）——HMR 的 WebSocket 就挂它上面，页面侧由垫片重写到它。
-        httpServer: (
-          webServer as {
-            server?: Parameters<typeof startViteDev>[1]["httpServer"];
-            desktopUpgradeServer?: Parameters<typeof startViteDev>[1]["httpServer"];
-          }
-        ).server ??
+        httpServer:
+          (
+            webServer as {
+              server?: Parameters<typeof startViteDev>[1]["httpServer"];
+              desktopUpgradeServer?: Parameters<typeof startViteDev>[1]["httpServer"];
+            }
+          ).server ??
           (
             webServer as {
               desktopUpgradeServer?: Parameters<typeof startViteDev>[1]["httpServer"];
@@ -304,7 +309,12 @@ export function apply(ctx: Context): void {
   /** 解析根那份 tsconfig 的路径（不存在时返回 undefined，交给 rolldown 默认）。 */
   const tsconfigOf = async (): Promise<string | undefined> => {
     const candidate = join(await resolutionRoot(), "tsconfig.json");
-    return (await readFile(candidate, "utf8").then(() => true, () => false)) ? candidate : undefined;
+    return (await readFile(candidate, "utf8").then(
+      () => true,
+      () => false,
+    ))
+      ? candidate
+      : undefined;
   };
 
   /**
@@ -351,11 +361,12 @@ export function apply(ctx: Context): void {
   // 缓存与 alias 都要仓库根，但 `apply` 是同步的：惰性算一次。
   let cacheRootCache: string | undefined;
   const cacheRootOf = async (): Promise<string> => (cacheRootCache ??= await cacheDir());
-  const federationAliasOf = async (): Promise<ReturnType<typeof clientModulesAlias>> => clientModulesAlias({
-    repoRoot: await resolutionRoot(),
-    // 联邦构建走 rolldown：替身必须是 CJS 形态，否则未知具名导入在构建期就是 `MISSING_EXPORT`。
-    nodeStub: join(appRoot, "node-stub.cjs"),
-  });
+  const federationAliasOf = async (): Promise<ReturnType<typeof clientModulesAlias>> =>
+    clientModulesAlias({
+      repoRoot: await resolutionRoot(),
+      // 联邦构建走 rolldown：替身必须是 CJS 形态，否则未知具名导入在构建期就是 `MISSING_EXPORT`。
+      nodeStub: join(appRoot, "node-stub.cjs"),
+    });
   // 外置说明符要写成"联邦地址"，而 `paths` 回调不能 await：先把要用的两张表算出来。
   // 表一：包名 → 它外置时该指的**出口**——`client` 就是清单里的一个普通 export（有 `./client` 用它，
   // 否则根出口）。这不是"身份判断"，所以 `immer` 这类三方不会因为它被特殊对待。
@@ -369,7 +380,10 @@ export function apply(ctx: Context): void {
    * 会多出第二条链：浏览器里同时有 `.vite/deps/react.js` 与我们的 `@client-modules/react@…/index.js`，
    * 两个 react 实例，hook 分发立刻报 `Invalid hook call`。
    */
-  const depsUrlOfSpecifier = async (specifier: string, importer?: string): Promise<string | undefined> => {
+  const depsUrlOfSpecifier = async (
+    specifier: string,
+    importer?: string,
+  ): Promise<string | undefined> => {
     // `@/…` 是本地文件（alias 管），不是包——`packageNameOf` 会把它切成 `@/vendor` 这种假包名。
     if (specifier.startsWith("@/")) return undefined;
     // `zlib` / `stream` 这类**裸名的 node 内置**不是包：接管成联邦地址只会换来一串 404。留给 alias
@@ -378,7 +392,9 @@ export function apply(ctx: Context): void {
     const bare = packageNameOf(specifier) || specifier;
     const root = await rootOf(bare);
     const devModule =
-      root !== undefined && !root.includes("node_modules") && !isAggregated(bare, await excludedOf());
+      root !== undefined &&
+      !root.includes("node_modules") &&
+      !isAggregated(bare, await excludedOf());
     if (devModule) return undefined;
     // 版本**从引用方解析**（`findPackageJSON` 按 node 的解析、与布局无关）：与产物侧同一条规则
     // （`resolvableVersionsOf`），两边写出的地址才对应得上。
@@ -393,7 +409,8 @@ export function apply(ctx: Context): void {
     const version =
       found === undefined
         ? undefined
-        : (JSON.parse(await readFile(found, "utf8").catch(() => "{}")) as { version?: string }).version;
+        : (JSON.parse(await readFile(found, "utf8").catch(() => "{}")) as { version?: string })
+            .version;
     return urlOf(specifier, {
       ...(version === undefined ? {} : { versions: new Map([[bare, version]]) }),
       clientRows: await clientRowIds(),
@@ -416,7 +433,7 @@ export function apply(ctx: Context): void {
     const federationAlias = await federationAliasOf();
     // `?v=` 是**构建世代**（见 `urlOf`）：它在地址里只是让"同一份产物的 URL 稳定且可辨识"，
     // 路由不据此改变响应（产物一律协商缓存）。
-    const rest = (url.slice(`${CLIENT_MODULES_PREFIX}/`.length).split("?")[0] ?? "");
+    const rest = url.slice(`${CLIENT_MODULES_PREFIX}/`.length).split("?")[0] ?? "";
     const slash = rest.indexOf("/");
     trace("rest %s slash %s", rest, slash);
     if (slash <= 0) return false;
@@ -433,7 +450,8 @@ export function apply(ctx: Context): void {
     const root = await rootOf(name);
     // 版本以**包清单**为准：URL 里那个是外置时按版本表写下的，而多版本共存时表只能猜（`katex@0.16.47`
     // 的 URL 解析到的可能是 0.18.10）——缓存键跟着清单走，键与内容才对得上。
-    const version = (root === undefined ? undefined : (await manifestOf(root))?.version) ?? urlVersion;
+    const version =
+      (root === undefined ? undefined : (await manifestOf(root))?.version) ?? urlVersion;
     const key = `${name.replaceAll("/", "+")}@${version}`;
     // **产出的整文件**（资产 / 拆出来的块）：产物里只留 URL，文件本身按清单（`.files.json`）取——清单是
     // "这个包产出里有什么"的唯一真相，也顺手挡住了凭 URL 读任意文件。
@@ -442,7 +460,9 @@ export function apply(ctx: Context): void {
     // 都没有源码对应（`src/chunk-abc.js` 不存在），混在同一段里服务端只能把它当出口，落空后回个空模块
     // （浏览器那边就是 "does not provide an export named …"）。
     if (file.startsWith("assets/") || file.startsWith("chunks/")) {
-      const manifest = JSON.parse(await readFile(join(cacheRoot, key, ".files.json"), "utf8").catch(() => "{}")) as {
+      const manifest = JSON.parse(
+        await readFile(join(cacheRoot, key, ".files.json"), "utf8").catch(() => "{}"),
+      ) as {
         files?: Record<string, string>;
       };
       const target = manifest.files?.[file];
@@ -452,7 +472,9 @@ export function apply(ctx: Context): void {
       const extension = file.slice(file.lastIndexOf(".") + 1).toLowerCase();
       res.writeHead(200, {
         "content-type":
-          extension === "js" ? "text/javascript; charset=utf-8" : (ASSET_MIME[extension] ?? "application/octet-stream"),
+          extension === "js"
+            ? "text/javascript; charset=utf-8"
+            : (ASSET_MIME[extension] ?? "application/octet-stream"),
         // 资产与块的文件名里就带内容 hash：内容与 URL 一一对应，可以长缓存。
         "cache-control": "public, max-age=31536000, immutable",
       });
@@ -467,9 +489,7 @@ export function apply(ctx: Context): void {
         : ((await exportTargetOf(root, exportName === "index" ? undefined : exportName)) ??
           // 清单没覆盖这个子路径时按物理路径找（没有 `exports` 的老包：`picomatch/posix` 就是 `posix.js`）。
           (await fileInPackage(root, exportName)));
-    trace(
-      `[fed] ${name}@${version}/${exportName} root=${String(root)} entry=${String(entry)}\n`,
-    );
+    trace(`[fed] ${name}@${version}/${exportName} root=${String(root)} entry=${String(entry)}\n`);
     if (entry === undefined) {
       // **如实报错**。走到这里只剩两类：仓库内的包这一侧没有实现（纯 host 包：只有 `./types` 出口、
       // `src/` 下全是宿主代码），或说明符既不是内置、也不在闭包里（这台机器上没有的可选依赖）。
@@ -483,7 +503,9 @@ export function apply(ctx: Context): void {
         `[federation] ${name}@${version}/${exportName}: unresolved-entry root=${String(root)}\n`,
       );
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
-      res.end(req.method === "HEAD" ? undefined : `unresolved entry: ${name}@${version}/${exportName}\n`);
+      res.end(
+        req.method === "HEAD" ? undefined : `unresolved entry: ${name}@${version}/${exportName}\n`,
+      );
       return true;
     }
     const bundled = await bundlePackage({
@@ -519,9 +541,13 @@ export function apply(ctx: Context): void {
       bundled.files.get(exportName) ??
       bundled.files.get("client.js") ??
       bundled.files.get("index.js");
-    trace(`${name}: target=${String(target)} 绝对=${String(target === undefined ? undefined : join(cacheRoot, target))}\n`);
+    trace(
+      `${name}: target=${String(target)} 绝对=${String(target === undefined ? undefined : join(cacheRoot, target))}\n`,
+    );
     if (target === undefined) {
-      ctx.logger.warn(`${name}: missing-export export=${exportName} have=${[...bundled.files.keys()].join(",")}\n`);
+      ctx.logger.warn(
+        `${name}: missing-export export=${exportName} have=${[...bundled.files.keys()].join(",")}\n`,
+      );
       return false;
     }
     const code = await readFile(join(cacheRoot, target), "utf8").catch((error: unknown) => {
@@ -576,7 +602,9 @@ export function apply(ctx: Context): void {
     if (!known) {
       trace("%s referer %s", req.url ?? "", req.headers.referer ?? "-");
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
-      res.end("client-modules: 这是仓库里的路径，打包形态下不存在（页面资源在 app-boot 下、包走 exports）\n");
+      res.end(
+        "client-modules: 这是仓库里的路径，打包形态下不存在（页面资源在 app-boot 下、包走 exports）\n",
+      );
       return;
     }
     trace(`[serveAny] ${req.url ?? ""}
@@ -601,9 +629,15 @@ export function apply(ctx: Context): void {
       // `WebSocket closed without opened.`）。
       const injected =
         viteHandoff?.hmr === true
-          ? html.replace("</head>", `  <script type="module" src="/@vite/client"></script>\n  </head>`)
+          ? html.replace(
+              "</head>",
+              `  <script type="module" src="/@vite/client"></script>\n  </head>`,
+            )
           : html;
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" });
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-cache",
+      });
       res.end(req.method === "HEAD" ? undefined : injected);
       return;
     }

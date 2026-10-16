@@ -5,13 +5,7 @@ import { SessionId } from "@deepseek-ai/dsh-session";
 import type { Session, SessionEvent } from "@deepseek-ai/dsh-session";
 import SessionProjectionRegistry from "@deepseek-ai/dsh-session-projection";
 import { appendLog } from "@morlay/session-rdb/testing";
-import {
-  harness,
-  meta,
-  SessionIdBrand,
-  TokenMeter,
-  turnLog,
-} from "../testing.ts";
+import { harness, meta, SessionIdBrand, TokenMeter, turnLog } from "../testing.ts";
 
 // 上游 TokenMeter 把折叠水位放在私有 states: WeakMap<Session, {consumedEvents}> 里（token-meter
 // 的 ReplayState）；测试只读它来验证「失效是否真的发生」——失效后水位必须等于当前 log 长度。

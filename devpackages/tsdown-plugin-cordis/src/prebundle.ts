@@ -40,7 +40,7 @@ export async function prebundleDependency(options: {
     platform: "browser",
     resolve: { conditionNames: spec.conditionNames },
     // 浏览器产物的替换约定（`process.env` / `import.meta` 空壳）：CJS 依赖常读 `process.env.NODE_ENV`，
-  // 不替掉会在浏览器里直接抛。
+    // 不替掉会在浏览器里直接抛。
     transform: { define: spec.define },
   });
   let code: string;

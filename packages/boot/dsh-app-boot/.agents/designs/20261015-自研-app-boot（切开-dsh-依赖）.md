@@ -17,14 +17,14 @@
 
 ## 事实基线（已核实，含出处）
 
-| 环节 | 出处 | 做什么 |
-| --- | --- | --- |
-| `runProfile` | `vendor/deepseek-harness/apps/cli/src/profile-boot.ts:244` | 装代理 → `composeProfile` → `boot` → 提交 `appReady` → 返回 `{ ctx, shutdown }` |
-| `composeProfile` | 同上 `:197` | 用调用方给的 profile；`createRuntimeResolution({ installAnchor, profile })`；解析 `--patch` overlays |
-| `boot` | `vendor/.../boot/app-boot/src/index.ts:975` | `new Context()` → `ctx.baseUrl` → `provide('dshHomePath')` → 装 fail-loud → `ctx.plugin(Loader)` → `prepare(ctx)` → `mountRootInclude(root, patches)` → `loader.await()` → 审计 |
-| `loadProfileDirectory` | `vendor/.../boot/app-boot/src/profile.ts:739` | 清单 → `dsh.profile.bundles` → 逐个 `resolveBundleDir` → 读该包 `dsh.bundle` → `bundlePatchPaths` → `loadOverlayPatches` → layers；再读 profile 自己的 `cordis.patch.yml` |
-| 层序 | 同上 `:739` + `composeProfile` | bundles 列表顺序 → profile 用户层 → `--patch` overlays |
-| **patch 应用与 id 匹配** | `mountRootInclude`（`app-boot/src/index.ts:540`）与 `PluginPackages` | **bundle 的依赖包被 insert 成行，patch 按 entry id 覆盖**；`ui-settings-general`、`locale` 这类 id 属于这一层 |
+| 环节                     | 出处                                                                 | 做什么                                                                                                                                                                          |
+| ------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runProfile`             | `vendor/deepseek-harness/apps/cli/src/profile-boot.ts:244`           | 装代理 → `composeProfile` → `boot` → 提交 `appReady` → 返回 `{ ctx, shutdown }`                                                                                                 |
+| `composeProfile`         | 同上 `:197`                                                          | 用调用方给的 profile；`createRuntimeResolution({ installAnchor, profile })`；解析 `--patch` overlays                                                                            |
+| `boot`                   | `vendor/.../boot/app-boot/src/index.ts:975`                          | `new Context()` → `ctx.baseUrl` → `provide('dshHomePath')` → 装 fail-loud → `ctx.plugin(Loader)` → `prepare(ctx)` → `mountRootInclude(root, patches)` → `loader.await()` → 审计 |
+| `loadProfileDirectory`   | `vendor/.../boot/app-boot/src/profile.ts:739`                        | 清单 → `dsh.profile.bundles` → 逐个 `resolveBundleDir` → 读该包 `dsh.bundle` → `bundlePatchPaths` → `loadOverlayPatches` → layers；再读 profile 自己的 `cordis.patch.yml`       |
+| 层序                     | 同上 `:739` + `composeProfile`                                       | bundles 列表顺序 → profile 用户层 → `--patch` overlays                                                                                                                          |
+| **patch 应用与 id 匹配** | `mountRootInclude`（`app-boot/src/index.ts:540`）与 `PluginPackages` | **bundle 的依赖包被 insert 成行，patch 按 entry id 覆盖**；`ui-settings-general`、`locale` 这类 id 属于这一层                                                                   |
 
 最后一行是当前 bug 的现场：`mydsh-profile` 的 patch 写法（`- id: locale` 等）与官方 patch 同构，生效与否
 取决于 insert 出来的 entry id —— 自研这一层之后，规则归我们，测试可以直接钉住它。
@@ -33,12 +33,30 @@
 
 ```ts
 // —— profile 组装（替代 loadProfileDirectory / loadLayeredEnv）
-interface ProfileLayer { packageName: string; packageDir: string; patchPaths: string[]; patches: PatchOptions[] }
-interface Profile { name: string; dir: string; layers: ProfileLayer[]; patchPath: string; patches: PatchOptions[]; skippedBundles: SkippedBundle[] }
+interface ProfileLayer {
+  packageName: string;
+  packageDir: string;
+  patchPaths: string[];
+  patches: PatchOptions[];
+}
+interface Profile {
+  name: string;
+  dir: string;
+  layers: ProfileLayer[];
+  patchPath: string;
+  patches: PatchOptions[];
+  skippedBundles: SkippedBundle[];
+}
 function loadProfile(binName: string, profileDir: string): Profile;
 function readProfilePatches(profileContext: ProfileContext, profile: Profile): PatchOptions[];
 // —— 外壳（替代 runProfile）
-interface RunProfileOptions { profile: string; profileDir: string; patchFiles: readonly string[]; args: readonly string[]; packageManager?: PackageManager }
+interface RunProfileOptions {
+  profile: string;
+  profileDir: string;
+  patchFiles: readonly string[];
+  args: readonly string[];
+  packageManager?: PackageManager;
+}
 function runProfile(options: RunProfileOptions): Promise<{ ctx: Context; shutdown: Shutdown }>;
 // —— 元数据（check-locale / devkit 用，替代 readPluginMeta）
 function readPluginMeta(name: string, manifestUrl: string): PluginMeta | undefined;
@@ -46,13 +64,13 @@ function readPluginMeta(name: string, manifestUrl: string): PluginMeta | undefin
 
 ## 要 provide 的服务面（上游 app 行 inject 的，少了就 pending）
 
-| 服务 | 谁 inject | 自研怎么给 |
-| --- | --- | --- |
-| `dshHomePath` | 各行的 `!!js` 配置与路径解析 | 自己 provide（`$DSH_HOME` 解析器） |
-| `cmdlineArgs` / `appExit` / `appReady` | `vendor/deepseek-harness/packages/bundle/web-app/src/startup.ts`、headless 等 | **继续用** `@deepseek-ai/dsh-cmdline` 的 `provideCmdline`（契约由这些消费方定义，复刻无收益） |
-| `launchEnvironment`（key = `launchEnvironment`） | credentials-local、open-in-app、web-app | **继续用** `@deepseek-ai/dsh-launch-environment` |
-| `profileContext` | 我们的桌面 patch 行与 web 行 | 自研 provide |
-| `loader` | loader 插件自身 | cordis 的 `@deepseek-ai/cordis-plugin-loader`（借） |
+| 服务                                             | 谁 inject                                                                     | 自研怎么给                                                                                    |
+| ------------------------------------------------ | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `dshHomePath`                                    | 各行的 `!!js` 配置与路径解析                                                  | 自己 provide（`$DSH_HOME` 解析器）                                                            |
+| `cmdlineArgs` / `appExit` / `appReady`           | `vendor/deepseek-harness/packages/bundle/web-app/src/startup.ts`、headless 等 | **继续用** `@deepseek-ai/dsh-cmdline` 的 `provideCmdline`（契约由这些消费方定义，复刻无收益） |
+| `launchEnvironment`（key = `launchEnvironment`） | credentials-local、open-in-app、web-app                                       | **继续用** `@deepseek-ai/dsh-launch-environment`                                              |
+| `profileContext`                                 | 我们的桌面 patch 行与 web 行                                                  | 自研 provide                                                                                  |
+| `loader`                                         | loader 插件自身                                                               | cordis 的 `@deepseek-ai/cordis-plugin-loader`（借）                                           |
 
 即：**借 cordis 的 Loader/include/group 与两个小包（cmdline / launch-environment），自研组装与外壳**。
 

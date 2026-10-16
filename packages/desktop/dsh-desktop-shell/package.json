@@ -20,6 +20,7 @@
     "dist"
   ],
   "type": "module",
+  "main": "./main.mjs",
   "exports": {
     ".": "./src/index.ts",
     "./appconfig": "./src/appconfig.ts",
@@ -69,6 +70,11 @@
     "build": "pnpm exec tsdown",
     "prepublishOnly": "pnpm run build"
   },
+  "dependencies": {
+    "@deepseek-ai/dsh-util-crypto": "workspace:*",
+    "@deepseek-ai/dsh-util-values": "workspace:*",
+    "@morlay/dsh-desktop-host": "workspace:*"
+  },
   "devDependencies": {
     "@local/devkit": "workspace:*",
     "@oxc-node/core": "^0.1.6",
@@ -82,11 +88,5 @@
   },
   "engines": {
     "node": ">=24.11.0"
-  },
-  "main": "./main.mjs",
-  "dependencies": {
-    "@deepseek-ai/dsh-util-crypto": "workspace:*",
-    "@deepseek-ai/dsh-util-values": "workspace:*",
-    "@morlay/dsh-desktop-host": "workspace:*"
   }
 }

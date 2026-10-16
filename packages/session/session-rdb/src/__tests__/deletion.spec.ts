@@ -7,10 +7,7 @@ import {
   type SessionHeader,
 } from "@deepseek-ai/dsh-session";
 import SessionProjectionRegistry from "@deepseek-ai/dsh-session-projection";
-import SessionPersistenceRdb, {
-  SessionBranchRdbProvider,
-  SessionDeletionError,
-} from "../index.ts";
+import SessionPersistenceRdb, { SessionBranchRdbProvider, SessionDeletionError } from "../index.ts";
 import { SESSION_DELETE_PATH } from "../deletion.ts";
 import { meta, oneTurnLog } from "../testing.ts";
 

@@ -1,6 +1,7 @@
 {
   "name": "@local/dshdev",
   "version": "0.2.6-alpha.0",
+  "private": true,
   "description": "dsh dev toolchain: run a workspace in the browser (`dshdev web`) or in the Electron shell (`dshdev desktop`), and package it as a static desktop app (`dshdev desktop bundle`).",
   "keywords": [
     "desktop",
@@ -44,6 +45,5 @@
   },
   "engines": {
     "node": ">=24.11.0"
-  },
-  "private": true
+  }
 }

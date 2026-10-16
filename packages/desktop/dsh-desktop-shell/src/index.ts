@@ -18,14 +18,8 @@ import { installDesktopDirectoryPicker } from "./directory-picker.ts";
 import { installDeveloperMenu } from "./developer-menu.ts";
 import { resolveDshHome } from "./dshhome.ts";
 import { DesktopHostProcess, type DesktopHostReady } from "./host-process.ts";
-import {
-  DESKTOP_IPC,
-  DESKTOP_SCHEME_ARGUMENT,
-  assertDesktopSender,
-  desktopScheme,
-} from "./ipc.ts";
-import {
-} from "./profile-project.ts";
+import { DESKTOP_IPC, DESKTOP_SCHEME_ARGUMENT, assertDesktopSender, desktopScheme } from "./ipc.ts";
+import {} from "./profile-project.ts";
 import { SEED_RUNTIME_DIR_NAME, ensureSeedProfile } from "./seed.ts";
 import { installDesktopShortcuts } from "./shortcuts.ts";
 import {
@@ -48,7 +42,8 @@ function shellRoot(): string {
 }
 
 function appConfigDir(): string {
-  const configured = developmentLayout() === undefined ? undefined : join(shellRoot(), "..", "runtime");
+  const configured =
+    developmentLayout() === undefined ? undefined : join(shellRoot(), "..", "runtime");
   return app.isPackaged || configured === undefined || configured === ""
     ? process.resourcesPath
     : configured;
@@ -91,8 +86,6 @@ protocol.registerSchemesAsPrivileged([
     },
   },
 ]);
-
-
 
 // Windows 自绘标题栏高度（DIP），与 preload 写入的 CSS 变量一致。
 const WINDOWS_TITLEBAR_HEIGHT = 40;
@@ -148,9 +141,10 @@ async function runtimeResources(): Promise<RuntimeResources> {
     node,
     seed,
     // 随包运行时与 pnpm 只在打包产物里存在；dev 形态从工作区解析依赖。
-    runtime: developmentLayout() === undefined
-      ? join(resourcesDir, "runtime")
-      : join(seed, SEED_RUNTIME_DIR_NAME),
+    runtime:
+      developmentLayout() === undefined
+        ? join(resourcesDir, "runtime")
+        : join(seed, SEED_RUNTIME_DIR_NAME),
     pnpm: join(resourcesDir, "runtime", "pnpm", "bin", "pnpm.mjs"),
     nodeBin: join(resourcesDir, "runtime", "bin"),
     // TS 运行时入口：**按路径取随包运行时里的那一份**（工具在备 runtime 时把 `@morlay/dsh-oxc-node` 的
@@ -291,7 +285,6 @@ async function shellLog(message: string, ...args: readonly unknown[]): Promise<v
     // 记不下来就算了：这里已在异常路径上，不该再抛。
   }
 }
-
 
 /** 文件在不在（项目禁同步 IO）。 */
 async function pathExistsOf(path: string): Promise<boolean> {
@@ -459,7 +452,8 @@ async function main(): Promise<void> {
     });
     const response = await active.fetch(conditional);
     // dev 形态打印每个应用请求：排查「页面 → 壳 → 宿主」断在哪一段。
-    if (!app.isPackaged) void shellLog(`${request.method} ${url.pathname} → ${String(response.status)}`);
+    if (!app.isPackaged)
+      void shellLog(`${request.method} ${url.pathname} → ${String(response.status)}`);
     return response;
   });
 

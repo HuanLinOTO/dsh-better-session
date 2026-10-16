@@ -3,9 +3,7 @@ import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import type { ChildProcess } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
-import {
-  DESKTOP_HOST_PROTOCOL_VERSION,
-} from "@morlay/dsh-desktop-host/wire";
+import { DESKTOP_HOST_PROTOCOL_VERSION } from "@morlay/dsh-desktop-host/wire";
 import { DesktopHostProcess, type DesktopHostOptions } from "../host-process.ts";
 
 interface SpawnCall {

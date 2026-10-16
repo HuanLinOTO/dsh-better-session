@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve as resolvePath, sep } from "node:path";
 
-
 // 开发态的 client 资源按**文件**寻址：`/plugins/{pkgName}/{version}/{filepath}`。仓库自己的包都是 TS/ESM
 // 源码（`exports` 在 patch 阶段已改指 `src`），所以逐个文件转译直出即可——浏览器原生 ESM 自己解析依赖，
 // 前端资源之间不再受模块表的行集（`inject`）限制。`version` 段取自包清单：既参与寻址，也天然当
@@ -84,9 +83,13 @@ export const DEFAULT_EXPORT_SEGMENT = "_default";
 export function parsePluginAddress(url: string): PluginAddress | undefined {
   const path = url.split("?")[0] ?? "";
   if (!path.startsWith(`${PLUGIN_ROUTE}/`)) return undefined;
-  const segments = path.slice(PLUGIN_ROUTE.length + 1).split("/").filter((segment) => segment !== "");
+  const segments = path
+    .slice(PLUGIN_ROUTE.length + 1)
+    .split("/")
+    .filter((segment) => segment !== "");
   // 不是按包寻址的都放行（上游的 combo `??a,b` 那类；如今资源由 vite 直接服务，这条路只留兜底）。
-  if (segments[0]?.startsWith("??") === true || segments[0]?.startsWith(".") === true) return undefined;
+  if (segments[0]?.startsWith("??") === true || segments[0]?.startsWith(".") === true)
+    return undefined;
   const [pkgSegment, version, ...exportSegments] = segments;
   if (pkgSegment === undefined || version === undefined) return undefined;
   const exportSegment = exportSegments.join("/");
@@ -127,15 +130,12 @@ function pickCondition(entry: unknown): string | undefined {
   return undefined;
 }
 
-
-
 /** 按文件寻址的解析结果：包名 + 包内相对路径（`src/client/index.ts` 这种）。 */
 export interface FileAddress {
   name: string;
   version: string;
   filepath: string;
 }
-
 
 /**
  * 工作区包索引：包名 → 包根。
@@ -150,7 +150,12 @@ let workspaceIndex: Promise<Map<string, string>> | undefined;
 export async function workspaceRootOf(from: string): Promise<string | undefined> {
   let directory = dirname(from);
   for (;;) {
-    if (await readFile(join(directory, "pnpm-workspace.yaml"), "utf8").then(() => true, () => false)) {
+    if (
+      await readFile(join(directory, "pnpm-workspace.yaml"), "utf8").then(
+        () => true,
+        () => false,
+      )
+    ) {
       return directory;
     }
     const parent = dirname(directory);
@@ -211,7 +216,10 @@ async function workspaceIndexOf(from: string): Promise<Map<string, string>> {
  * `./package.json`，那样明明装着也解析不出来。
  */
 export async function packageRootOf(from: string, name: string): Promise<PackageRoot | undefined> {
-  const bare = name.split("/").slice(0, name.startsWith("@") ? 2 : 1).join("/");
+  const bare = name
+    .split("/")
+    .slice(0, name.startsWith("@") ? 2 : 1)
+    .join("/");
   // 虚拟模块的 id（`\0…`）不是路径：`createRequire` 拿到它会抛，直接跳过这层解析。
   const require = from.startsWith("\0") ? undefined : createRequire(from);
   try {
@@ -226,7 +234,12 @@ export async function packageRootOf(from: string, name: string): Promise<Package
   }
   for (const directory of require?.resolve.paths(bare) ?? []) {
     const manifest = join(directory, bare, "package.json");
-    if (await readFile(manifest, "utf8").then(() => true, () => false)) {
+    if (
+      await readFile(manifest, "utf8").then(
+        () => true,
+        () => false,
+      )
+    ) {
       const owned = await owningPackageOf(manifest);
       if (owned !== undefined) return owned;
     }
@@ -258,7 +271,8 @@ export async function exportTargetOf(
     // · 没有 `exports` → 按 node 规则退回 `module` → `main`（老包如 `fortune-sheet`）。
     const table = manifest.exports;
     const isSubpathMap =
-      table !== undefined && Object.keys(table).some((name) => name === "." || name.startsWith("./"));
+      table !== undefined &&
+      Object.keys(table).some((name) => name === "." || name.startsWith("./"));
     const entry =
       (isSubpathMap ? table?.[key] : key === "." ? table : undefined) ??
       (key === "." ? (manifest.module ?? manifest.main) : undefined);
@@ -292,7 +306,9 @@ export interface PackageManifest {
 /** 读包清单。 */
 export async function manifestOf(root: string): Promise<PackageManifest | undefined> {
   try {
-    const manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as Partial<PackageManifest>;
+    const manifest = JSON.parse(
+      await readFile(join(root, "package.json"), "utf8"),
+    ) as Partial<PackageManifest>;
     if (manifest.name === undefined) return undefined;
     return { ...manifest, name: manifest.name, version: manifest.version ?? "0" };
   } catch {
@@ -335,7 +351,14 @@ export async function fileInPackage(root: string, subpath: string): Promise<stri
     join(subpath, "index.ts"),
   ]) {
     const file = resolveInPackage(pkg, candidate);
-    if (file !== undefined && (await readFile(file, "utf8").then(() => true, () => false))) return file;
+    if (
+      file !== undefined &&
+      (await readFile(file, "utf8").then(
+        () => true,
+        () => false,
+      ))
+    )
+      return file;
   }
   return undefined;
 }
@@ -346,9 +369,6 @@ export interface ResolvedSpecifier {
   filepath: string;
   url: string;
 }
-
-
-
 
 /**
  * 说明符里的包名：`@scope/name` 取两段、`name` 取一段。作用域包**没有子路径**时，
@@ -362,10 +382,6 @@ export function packageNameOf(specifier: string): string {
   return second < 0 ? specifier : specifier.slice(0, second);
 }
 
-
-
-
-
 /**
  * 包根 → 它**浏览器面**的文件。
  *
@@ -374,13 +390,21 @@ export function packageNameOf(specifier: string): string {
  * @returns 该出口对应的文件；清单没这个出口、且约定路径也不存在时返回 undefined。
  */
 export async function clientHalfOf(root: string, subpath?: string): Promise<string | undefined> {
-  const exists = async (file: string): Promise<boolean> => await readFile(file, "utf8").then(() => true, () => false);
+  const exists = async (file: string): Promise<boolean> =>
+    await readFile(file, "utf8").then(
+      () => true,
+      () => false,
+    );
   if (subpath !== undefined) {
     const byExports = await exportTargetOf(root, subpath);
     if (byExports !== undefined) return byExports;
     // 清单没覆盖的按物理路径试（`src/<subpath>/index.ts` 是 client 半的约定位置）。
     const pkg = { name: "", version: "", root };
-    for (const candidate of [join("src", subpath, "index.ts"), join(subpath, "index.ts"), subpath]) {
+    for (const candidate of [
+      join("src", subpath, "index.ts"),
+      join(subpath, "index.ts"),
+      subpath,
+    ]) {
       const file = resolveInPackage(pkg, candidate);
       if (file !== undefined && (await exists(file))) return file;
     }

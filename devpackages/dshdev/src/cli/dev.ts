@@ -73,10 +73,7 @@ async function run(
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       if (code === 0) resolvePromise();
-      else
-        reject(
-          new Error(`${args.join(" ")} exited with ${String(code ?? signal)}`),
-        );
+      else reject(new Error(`${args.join(" ")} exited with ${String(code ?? signal)}`));
     });
   });
 }
@@ -233,7 +230,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     const profileRoot = profileOverride ?? prod?.profileDir ?? workspace;
     // 值与结构当参数传（`%o`），不拼 `key=value`：键名 `.` 分层、不带空格。
     log.info("web mode%s %o", prodSurface ? " (prod surface)" : "", {
-      "DSH_HOME": dataDir,
+      DSH_HOME: dataDir,
       "profile.root": profileRoot,
     });
     await run(

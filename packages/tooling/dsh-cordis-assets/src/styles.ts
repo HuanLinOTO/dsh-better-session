@@ -185,7 +185,11 @@ export function compileStyleModule(options: {
 export async function compileCssModule(
   file: string,
   source: string,
-  options: { minify?: boolean; assets?: CssAssetPolicy; emit?: (name: string, bytes: Uint8Array) => string } = {},
+  options: {
+    minify?: boolean;
+    assets?: CssAssetPolicy;
+    emit?: (name: string, bytes: Uint8Array) => string;
+  } = {},
 ): Promise<string> {
   const replacements = await urlReplacements(source, file, options.assets, options.emit);
   const { code, exports } = transform({
@@ -204,7 +208,11 @@ export async function compileCssModule(
 export async function compileGlobalCss(
   file: string,
   source: string,
-  options: { minify?: boolean; assets?: CssAssetPolicy; emit?: (name: string, bytes: Uint8Array) => string } = {},
+  options: {
+    minify?: boolean;
+    assets?: CssAssetPolicy;
+    emit?: (name: string, bytes: Uint8Array) => string;
+  } = {},
 ): Promise<string> {
   const replacements = await urlReplacements(source, file, options.assets, options.emit);
   const { code } = transform({
@@ -321,7 +329,12 @@ export function cssInlinePlugins(options: {
         this.addWatchFile(file);
         const source = await readFile(file);
         // `url()` 的替换挂到**这一趟**：在它之前改文本会被 lightningcss 自己重写成裸 hash。
-        const replacements = await urlReplacements(source.toString(), file, options.assets, emitAsset);
+        const replacements = await urlReplacements(
+          source.toString(),
+          file,
+          options.assets,
+          emitAsset,
+        );
         const { code, exports } = transform({
           filename: file,
           code: source,
@@ -351,7 +364,12 @@ export function cssInlinePlugins(options: {
         const emitAsset = (assetName: string, bytes: Uint8Array): string =>
           placeholderFor(assetName, bytes);
         const source = await readFile(file);
-        const replacements = await urlReplacements(source.toString(), file, options.assets, emitAsset);
+        const replacements = await urlReplacements(
+          source.toString(),
+          file,
+          options.assets,
+          emitAsset,
+        );
         const { code } = transform({
           filename: file,
           code: source,
@@ -377,7 +395,12 @@ export function cssInlinePlugins(options: {
         const emitAsset = (assetName: string, bytes: Uint8Array): string =>
           placeholderFor(assetName, bytes);
         const source = await readFile(file);
-        const replacements = await urlReplacements(source.toString(), file, options.assets, emitAsset);
+        const replacements = await urlReplacements(
+          source.toString(),
+          file,
+          options.assets,
+          emitAsset,
+        );
         const { code } = transform({
           filename: file,
           code: source,

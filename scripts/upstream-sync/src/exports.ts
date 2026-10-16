@@ -165,7 +165,9 @@ async function importedPackagesOf(dir: string): Promise<Set<string>> {
           if (isBareSpecifier(source)) found.add(packageNameOf(source));
         }
         if (record["type"] === "CallExpression") {
-          const callee = record["callee"] as { name?: unknown; property?: { name?: unknown } } | undefined;
+          const callee = record["callee"] as
+            | { name?: unknown; property?: { name?: unknown } }
+            | undefined;
           const first = (record["arguments"] as { value?: unknown }[] | undefined)?.[0];
           // `require("x")` 与 `import.meta.resolve("x")`（后者长成 `(<import.meta>).resolve(...)`）。
           if (

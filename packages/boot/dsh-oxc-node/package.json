@@ -5,9 +5,9 @@
   "keywords": [
     "dsh",
     "dsh-plugin",
-    "typescript",
     "loader",
-    "oxc"
+    "oxc",
+    "typescript"
   ],
   "license": "MIT",
   "author": "morlay",

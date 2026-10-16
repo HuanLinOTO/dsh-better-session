@@ -47,16 +47,12 @@ async function readManifest(dir: string): Promise<PackageManifest> {
   }
 }
 
-
 // The tool's own dependency on the desktop host variant (`import.meta.resolve` runs from this
 // module, so it can only reach the tool's own dependency). Returns the payload directory and its
 // manifest version, or `undefined` before the variant is built.
 
 // Install the tool's host payload into a closure, replacing any payload already there. Returns the
 // installed payload directory.
-
-
-
 
 function isPackagePayload(path: string, root: string): boolean {
   const relativePath = path.slice(root.length).replace(/^[\\/]+/u, "");
@@ -110,7 +106,6 @@ export async function copyPackageTree(source: string, target: string): Promise<v
     if (await pathExists(from)) await copy(from, join(target, ...entry.split("/")));
   }
 }
-
 
 export async function closurePackageDirs(modulesDir: string): Promise<Map<string, string>> {
   const found = new Map<string, string>();
@@ -183,4 +178,3 @@ export async function missingOfficialPackages(modulesDir: string): Promise<Map<s
   }
   return missing;
 }
-

@@ -7,6 +7,9 @@
     ".": "./src/index.ts",
     "./dts": "./src/dts.ts"
   },
+  "dependencies": {
+    "@morlay/dsh-cordis-assets": "workspace:*"
+  },
   "devDependencies": {
     "@deepseek-ai/cordis-plugin-include": "workspace:*",
     "@deepseek-ai/dsh-app-boot": "workspace:*",
@@ -22,8 +25,5 @@
   "peerDependencies": {
     "tsdown": "0.23.x",
     "typescript": "7.x"
-  },
-  "dependencies": {
-    "@morlay/dsh-cordis-assets": "workspace:*"
   }
 }
