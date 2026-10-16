@@ -21,7 +21,6 @@ import { DesktopHostProcess, type DesktopHostReady } from "./host-process.ts";
 import {
   DESKTOP_IPC,
   DESKTOP_SCHEME_ARGUMENT,
-  DESKTOP_WS_PORT_ARGUMENT,
   assertDesktopSender,
   desktopScheme,
 } from "./ipc.ts";
@@ -197,8 +196,6 @@ function windowFrame(): Pick<
 function createWindow(
   preload: string,
   config: { width: number; height: number; minWidth: number; minHeight: number },
-  /** 宿主回环的 ws 端口（页面把 `ws://app/…` 重写到它，见 preload 的 `__DSH_DESKTOP_WS__`）。 */
-  wsPort: number,
 ): BrowserWindowType {
   const window = new BrowserWindow({
     width: config.width,
@@ -217,7 +214,6 @@ function createWindow(
       additionalArguments: [
         `${DESKTOP_SCHEME_ARGUMENT}=${SCHEME}`,
         // 页面把它当作 `ws://app/…` 的落点（见 preload 的 `__DSH_DESKTOP_WS__`）。
-        `${DESKTOP_WS_PORT_ARGUMENT}=${String(wsPort)}`,
       ],
     },
   });
@@ -554,13 +550,12 @@ async function main(): Promise<void> {
   });
 
   /** 宿主回环的 ws 端口：宿主起好之后填入（窗口重建时仍用它）。 */
-  let desktopWsPort = 0;
   // 窗口载入的地址：宿主 webServer 的 origin（`http://127.0.0.1:<port>`）。以前是自定义协议
   // `dsh-custom-next://app/`——那条路没有 origin，settings 的 describe 流等长连接拿不到答复。
   let hostOrigin = "";
   let appPreload = preloadPathOf();
   const createMainWindow = (): BrowserWindowType => {
-    const window = createWindow(appPreload, appConfig.window, desktopWsPort);
+    const window = createWindow(appPreload, appConfig.window);
     mainWindow = window;
     shortcuts.attach(window);
     window.once("ready-to-show", () => {
@@ -601,7 +596,6 @@ async function main(): Promise<void> {
 
   const started = await startHost();
   host = started.process;
-  desktopWsPort = started.ready.wsPort;
   hostOrigin = started.ready.origin;
   // preload 的字节由宿主机现场打包（sandboxed preload 只能 CJS，也挂不了 hooks）：取回来落到用户数据目录，
   // 再把路径交给窗口——装配目录里因此没有预产的 `dist/`。
@@ -615,7 +609,6 @@ async function main(): Promise<void> {
     );
   }
   await writeFile(appPreload, await preload.text(), "utf8");
-  await shellLog(`宿主就绪 wsPort=${String(desktopWsPort)} origin=${hostOrigin}`);
 
   mainWindow = createMainWindow();
   await mainWindow.loadURL(hostOrigin);

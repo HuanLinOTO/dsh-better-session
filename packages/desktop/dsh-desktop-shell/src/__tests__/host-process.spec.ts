@@ -6,9 +6,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   DESKTOP_HOST_PROTOCOL_VERSION,
   DesktopHostRequestDecoder,
-  encodeDesktopResponseData,
-  encodeDesktopResponseEnd,
-  encodeDesktopResponseStart,
 } from "@morlay/dsh-desktop-host/wire";
 import { DesktopHostProcess, type DesktopHostOptions } from "../host-process.ts";
 
@@ -79,26 +76,16 @@ function harness(options: Partial<DesktopHostOptions> = {}, inspectPort?: number
 const ENTRY = join("/app/seed", "node_modules", "@morlay", "dsh-desktop-host", "src", "index.ts");
 
 function ready(child: FakeChild): void {
-  child.emit("message", { type: "ready", protocolVersion: DESKTOP_HOST_PROTOCOL_VERSION });
+  child.emit("message", {
+    type: "ready",
+    protocolVersion: DESKTOP_HOST_PROTOCOL_VERSION,
+    origin: "http://127.0.0.1:3000",
+  });
 }
 
 // 从请求管道读到至少 count 条完整帧（帧写入跨 tick）。
-async function readFrames(
-  child: FakeChild,
-  decoder: DesktopHostRequestDecoder,
-  count: number,
-): Promise<ReturnType<DesktopHostRequestDecoder["push"]>> {
-  const frames: ReturnType<DesktopHostRequestDecoder["push"]> = [];
-  for (let attempt = 0; attempt < 100 && frames.length < count; attempt += 1) {
-    const chunk = child.requestPipe.read() as Buffer | null;
-    if (chunk !== null) frames.push(...decoder.push(chunk));
-    else await new Promise((resolve) => setTimeout(resolve, 2));
-  }
-  return frames;
-}
-
 describe("桌面 host 子进程", () => {
-  it("按管道形态启动：入口路径、argv 顺序与五元组 stdio", async () => {
+  it("启动形态：入口路径、argv 顺序与 stdio", async () => {
     const { calls, child, host } = harness(
       {
         packageManager: { pnpm: "/app/runtime/pnpm/bin/pnpm.mjs", nodeBin: "/app/runtime/bin" },
@@ -110,7 +97,7 @@ describe("桌面 host 子进程", () => {
     expect(calls).toHaveLength(1);
     const call = calls[0];
     expect(call?.command).toBe("/runtime/node/node");
-    expect(call?.stdio).toEqual(["ignore", "pipe", "pipe", "pipe", "pipe", "ipc"]);
+    expect(call?.stdio).toEqual(["ignore", "pipe", "pipe", "ipc"]);
     expect(call?.cwd).toBe("/home/profiles/desktop");
     expect(call?.args.slice(0, 3)).toEqual([
       "--expose-internals",
@@ -129,7 +116,10 @@ describe("桌面 host 子进程", () => {
       "/app/runtime/bin",
     ]);
     ready(child);
-    await expect(started).resolves.toEqual({ protocolVersion: DESKTOP_HOST_PROTOCOL_VERSION });
+    await expect(started).resolves.toEqual({
+      protocolVersion: DESKTOP_HOST_PROTOCOL_VERSION,
+      origin: "http://127.0.0.1:3000",
+    });
     const stopped = host.stop();
     child.emit("close", 0);
     await stopped;
@@ -177,67 +167,6 @@ describe("桌面 host 子进程", () => {
     }
   });
 
-  it("GET 请求写出 start 帧并把响应解码成 Response", async () => {
-    const { child, host } = harness();
-    const started = host.start();
-    ready(child);
-    await started;
-
-    const pending = host.fetch(new Request("dsh-app://app/api/list"));
-    const frames = await readFrames(child, new DesktopHostRequestDecoder(), 1);
-    expect(frames).toHaveLength(1);
-    expect(frames[0]).toMatchObject({
-      type: "start",
-      streamId: 1,
-      url: "dsh-app://app/api/list",
-      method: "GET",
-      hasBody: false,
-    });
-
-    child.responsePipe.write(
-      encodeDesktopResponseStart(1, {
-        status: 200,
-        headers: [["content-type", "application/json"]],
-        hasBody: true,
-      }),
-    );
-    child.responsePipe.write(encodeDesktopResponseData(1, Buffer.from("[1]")));
-    child.responsePipe.write(encodeDesktopResponseEnd(1));
-
-    const response = await pending;
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toBe("application/json");
-    await expect(response.text()).resolves.toBe("[1]");
-    const stopped = host.stop();
-    child.emit("close", 0);
-    await stopped;
-  });
-
-  it("带 body 的请求写出 data 与 end 帧", async () => {
-    const { child, host } = harness();
-    const started = host.start();
-    ready(child);
-    await started;
-
-    const pending = host.fetch(
-      new Request("dsh-app://app/api/save", { method: "POST", body: "payload" }),
-    );
-    const frames = await readFrames(child, new DesktopHostRequestDecoder(), 3);
-    expect(frames.map((frame) => frame.type)).toEqual(["start", "data", "end"]);
-    expect(frames[0]).toMatchObject({ method: "POST", hasBody: true });
-    expect((frames[1] as { data: Buffer }).data.toString()).toBe("payload");
-
-    child.responsePipe.write(
-      encodeDesktopResponseStart(1, { status: 204, headers: [], hasBody: false }),
-    );
-    child.responsePipe.write(encodeDesktopResponseEnd(1));
-    expect((await pending).status).toBe(204);
-    const stopped = host.stop();
-    child.emit("close", 0);
-    await stopped;
-  });
-
-  // 后端调试端点：壳只发命令与订阅状态，端口与端点由 host 回报（壳不猜端口）。
   it("调试端点命令走 IPC，端点状态回调给订阅者", async () => {
     const { child, host } = harness();
     const started = host.start();
@@ -266,7 +195,7 @@ describe("桌面 host 子进程", () => {
     await stopped;
   });
 
-  it("stop 通过 IPC 请求收尾并关掉请求管道写端", async () => {
+  it("stop 通过 IPC 请求收尾", async () => {
     const { child, host } = harness();
     const started = host.start();
     ready(child);
@@ -275,6 +204,5 @@ describe("桌面 host 子进程", () => {
     child.emit("close", 0);
     await stopped;
     expect(child.sent).toEqual([{ type: "shutdown" }]);
-    expect(child.requestPipe.destroyed).toBe(true);
   });
 });

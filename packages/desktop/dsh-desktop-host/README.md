@@ -8,8 +8,8 @@
 
 被 [`@local/dshdev`](../../../devpackages/dshdev/README.md) 使用，不单独跑：
 
-- `dev` / `bundle` 把本包落位到部署的 `<runtime>/node_modules/@morlay/dsh-desktop-host`（`dev` 从工作区解析同一份包，`bundle` 按 manifest `files` 复制），三样必须都在——`src/index.ts`（启动入口，壳按 node 解析取**源码**，由 TS loader 转译）、`src/webserver.ts`（桌面 patch 行按 `../src/webserver.ts` 加载）、`config/desktop.cordis.patch.yml`（入口按它作 `patchFiles` 读）；
-- 壳启动它（stdio 五元组：FD 3/4 是管道，FD 5 是 Node IPC），argv 与 web 入口**同一套**
+- `dev` / `bundle` 把本包落位到部署的 `<runtime>/node_modules/@morlay/dsh-desktop-host`（`dev` 从工作区解析同一份包，`bundle` 按 manifest `files` 复制），三样必须都在——`src/index.ts`（启动入口，壳按 node 解析取**源码**，由 TS loader 转译）、当时那个无端口替身（已删）（桌面 patch 行按 当时那个无端口替身（已删） 加载）、`config/desktop.cordis.patch.yml`（入口按它作 `patchFiles` 读）；
+- 壳启动它（stdio：stdout/stderr 落盘 + FD 5 是 Node IPC），argv 与 web 入口**同一套**
   （解析只有一处，见 [`src/invocation.ts`](./src/invocation.ts)）：
 
   ```

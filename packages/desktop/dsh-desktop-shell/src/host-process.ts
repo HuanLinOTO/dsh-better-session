@@ -5,8 +5,6 @@ import { Readable, Writable } from "node:stream";
 import {
   DESKTOP_HOST_PROTOCOL_VERSION,
   DESKTOP_PIPE_CHUNK_BYTES,
-  DESKTOP_REQUEST_PIPE_FD,
-  DESKTOP_RESPONSE_PIPE_FD,
   DesktopHostResponseDecoder,
   encodeDesktopRequestCancel,
   encodeDesktopRequestData,
@@ -52,7 +50,6 @@ async function exitsWithin(exit: Promise<void>, milliseconds: number): Promise<b
 export interface DesktopHostReady {
   readonly protocolVersion: number;
   /** 宿主进程内回环的 ws 端口（页面把 `ws://app/…` 重写到这里，见 `@morlay/dsh-desktop-host/ws-bridge`）。 */
-  readonly wsPort: number;
   /** 宿主 webServer 的 origin（`http://127.0.0.1:<port>`）：窗口就是载入它。 */
   readonly origin: string;
 }
@@ -165,17 +162,9 @@ export class DesktopHostProcess {
     const child = spawnChild(this.node, args, {
       cwd: this.profileDir,
       env,
-      stdio: ["ignore", "pipe", "pipe", "pipe", "pipe", "ipc"],
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
     });
-    const requestPipe = child.stdio[DESKTOP_REQUEST_PIPE_FD];
-    const responsePipe = child.stdio[DESKTOP_RESPONSE_PIPE_FD];
-    if (!(requestPipe instanceof Writable) || !(responsePipe instanceof Readable)) {
-      child.kill("SIGTERM");
-      throw new Error("dsh desktop host did not expose the required byte pipes and IPC channel");
-    }
     this.child = child;
-    this.requestPipe = requestPipe;
-    this.responsePipe = responsePipe;
     // 宿主输出除转发之外**再落一份盘**（见 `logFile`）：打包形态 GUI 里看不到 stdout/stderr，
     // 而"少服务"的原因只在宿主这份输出里。
     const persist = (chunk: string): void => {
@@ -192,24 +181,6 @@ export class DesktopHostProcess {
     child.stdout?.on("data", (chunk: string) => {
       process.stdout.write(chunk);
       persist(chunk);
-    });
-    responsePipe.on("data", (chunk: Buffer) => {
-      this.acceptResponseBytes(chunk);
-    });
-    responsePipe.once("end", () => {
-      try {
-        this.responseDecoder.finish();
-      } catch (error) {
-        this.fail(errorOf(error, "dsh desktop host response pipe failed"));
-        return;
-      }
-      this.fail(new Error("dsh desktop host response pipe ended"));
-    });
-    requestPipe.once("error", (error) => {
-      this.fail(error);
-    });
-    responsePipe.once("error", (error) => {
-      this.fail(error);
     });
     child.on("message", (message: unknown) => {
       if (!isDesktopHostEvent(message)) {
@@ -231,7 +202,6 @@ export class DesktopHostProcess {
       }
       this.readyResolve({
         protocolVersion: message.protocolVersion,
-        wsPort: message.wsPort,
         origin: message.origin,
       });
     });

@@ -11,7 +11,7 @@ iframe 内的 bootstrap 按 `location` 算出 WebSocket 端点（`assets/devtool
 于是端点被算成 `ws://app/inspector/devtools/cdp`：`app` 不是可解析主机，而 Electron 至今不支持自定义协议上的
 WebSocket（[electron#43522](https://github.com/electron/electron/issues/43522) 仍 open）。就算端点写对，桌面主传输也只有
 fetch（[index.ts:329](../../src/index.ts#L329) → 无端口 `webServer.dispatch`），`registerUpgrade` 那张表
-（[webserver.ts:241](../../../dsh-desktop-host/src/webserver.ts#L241)）在桌面档没有消费者——**面板在桌面档必然空白**。
+（当时那份无端口替身（已删，原 webserver.ts:241））在桌面档没有消费者——**面板在桌面档必然空白**。
 
 而「看后端」这件事本来有更短的路：host 是普通 node 进程（打包档也是随包 node 二进制，`--inspect` 与
 `node:inspector` 都可用），Node inspector 监听的是**真实回环端口**，DevTools 前端直连它不需要任何新通道。

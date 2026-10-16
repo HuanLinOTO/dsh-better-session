@@ -89,12 +89,6 @@ export type DesktopHostEvent =
       readonly type: "ready";
       readonly protocolVersion: typeof DESKTOP_HOST_PROTOCOL_VERSION;
       /**
-       * 进程内回环上的 ws 端口（`127.0.0.1:<port>`）：桌面形态的页面拿不到 ws 端点（自定义协议下
-       * `ws://app/…` 无处可去），壳把这个端口经 preload 告诉页面，页面把地址重写过来即可用**原生**
-       * `WebSocket`。端口随机、只回环、不出本机。
-       */
-      readonly wsPort: number;
-      /**
        * webServer 的 origin（`http://127.0.0.1:<port>`）：壳用它载入窗口。基于 URL/WS 的东西（settings 的
        * describe 流、账号的 stream mux、vite 的 HMR）要求窗口来源就是它。
        */
