@@ -47,11 +47,6 @@ import {
 } from "./wire.ts";
 
 const DESKTOP_PATCH = fileURLToPath(new URL("../config/desktop.cordis.patch.yml", import.meta.url));
-// 前端服务（`@morlay/dsh-client-modules`）单独一层：**两种形态**都要挂它（dev 由工具按
-// `dsh.bundle.patch` 挂、打包形态随 app 的 `dsh.profile.bundles` 进 profile），但不要桌面专属的那几层。
-const DEV_CLIENT_PATCH = fileURLToPath(
-  new URL(import.meta.resolve("@morlay/web-custom-profile/cordis.patch.yml")),
-);
 
 interface PendingRequest {
   readonly abort: AbortController;
@@ -151,7 +146,9 @@ async function main(): Promise<void> {
     environment: loadLayeredEnv("dsh"),
     profile: "desktop",
     resolvedProfile: { profile, installAnchor },
-    patchFiles: [DESKTOP_PATCH, DEV_CLIENT_PATCH],
+    // 装配**完全**由 profile 的 `dsh.profile.bundles` 决定（各 bundle 自己的 patch 由 loader 按
+    // `dsh.bundle.patch` 读）；这里只留桌面形态自己的那一层 overlay。
+    patchFiles: [DESKTOP_PATCH],
     args: ["--no-open"],
     ...(pnpmEntry === undefined
       ? {}

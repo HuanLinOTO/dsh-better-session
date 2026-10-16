@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
-import { access, mkdir, readFile } from "node:fs/promises";
+import { access, mkdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { writeAppConfig } from "@morlay/dsh-desktop-shell/appconfig";
 import { DESKTOP_HOST_PACKAGE } from "@morlay/dsh-desktop-shell/official";
 import { devRuntimeRoot, requireDevRuntime } from "./dev-layout.ts";
@@ -81,28 +81,6 @@ async function webEntry(): Promise<string> {
     throw new Error(`desktop development: missing ${entry}; run the tool build (pnpm build)`);
   }
   return entry;
-}
-
-// 源码 client 半「现场打包」那条行的定义只有一份：宿主包里的 overlay（它按相对路径指自己的 `lib/`）。
-// 桌面形态由宿主自己挂；web 形态的 profile 就是 app 目录，宿主那层拿不到，所以这里按 `--patch` 挂上。
-async function devClientPatch(workspace: string): Promise<string> {
-  // dev 形态的前端装配层（挂 `@morlay/dsh-client-modules`、停上游那几行）由 **app 自己的一个 bundle** 提供：
-  // web 与桌面两种形态挂的是**同一份** patch。
-  //
-  // **从 app 的 `dsh.profile.bundles` 里找**（按 app 的解析面），不在工具里写死包名——那个 bundle 是 app 的
-  // 依赖，工具多一条直接依赖只会在上游改名时多一处要改的地方。
-  const root = resolve(workspace);
-  const manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as {
-    dsh?: { profile?: { bundles?: string[] } };
-  };
-  const from = pathToFileURL(join(root, "package.json")).href;
-  for (const bundle of manifest.dsh?.profile?.bundles ?? []) {
-    const patch = fileURLToPath(import.meta.resolve(`${bundle}/cordis.patch.yml`, from));
-    if (await pathExists(patch)) return patch;
-  }
-  throw new Error(
-    `desktop development: no bundle in ${root}/package.json 的 dsh.profile.bundles 提供 cordis.patch.yml`,
-  );
 }
 
 /**
@@ -223,8 +201,9 @@ export async function runDev(options: DevOptions): Promise<void> {
     // 因此没有 `plugin add`、也没有 `$DSH_HOME/profiles/web`。端口契约（`PORT`，缺省 3080）与
     // 内层参数归 web 入口：它把 `--` 之后原样交给 web app 的 flag family。
     //
-    // `--prod` 时 profile 换成 seed 里那份（含 profile bundles），前端装配也在那里，所以**不挂** dev
-    // 形态那份 `--patch`。
+    // 装配**完全**来自 profile 的 `dsh.profile.bundles`：各 bundle 自己的 patch 由 loader 按
+    // `dsh.bundle.patch` 读，这里一个 overlay 都不额外挂——否则 dev 与打包两条路挂的层不同，
+    // 出了问题没法定位（"哪个 patch 生效"必须两边同源）。
     const profileRoot = prod?.profileDir ?? workspace;
     console.log(
       `desktop development: web mode${prod === undefined ? "" : " (prod surface)"} ` +
@@ -232,14 +211,7 @@ export async function runDev(options: DevOptions): Promise<void> {
     );
     await run(
       process.execPath,
-      [
-        await webEntry(),
-        "--profile-dir",
-        profileRoot,
-        "--runtime-dir",
-        activeRuntimeDir,
-        ...(prod === undefined ? ["--patch", await devClientPatch(workspace)] : []),
-      ],
+      [await webEntry(), "--profile-dir", profileRoot, "--runtime-dir", activeRuntimeDir],
       repositoryRoot,
       withTsLoader(
         {
