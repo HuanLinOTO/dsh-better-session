@@ -1,15 +1,13 @@
 import { defineConfig } from "tsdown";
 import { cordisPlugin } from "@local/tsdown-plugin-cordis";
 
-// host 半插件（挂 `agent/pre-step` 展开引用），没有 client 入口，所以只产 ESM。
+// host 插件在 `agent/pre-step` 扩展点用，没有 client 入口，构建只需要 ESM。
 //
-// 引用解析的 home 是 `@morlay/dsh-client-ui-primitives` 的 `reference.ts`（`ADR-引用的统一解析与渲染转换`，
-// 在 `ui-conversation-message-actions` 的 `.agents/adrs/`）——那份包同时带 client 样式层与 React 渲染，所以这里
-// 把用到的解析实现**内联进产物**，发布清单里不出现它。
+// Windows 规避（见升级 PR）：`inline` 点名在 win32 上把内联目标解析成反斜杠绝对路径的
+// 运行期 import（不可分发）。改为把 `@morlay/dsh-client-ui-primitives` 声明为正式
+// `dependencies` 条目（构建期 external、部署期随包安装），不再走 inline。
 export default defineConfig({
   plugins: [
-    cordisPlugin({
-      inline: ["@morlay/dsh-client-ui-primitives"],
-    }),
+    cordisPlugin({}),
   ],
 });

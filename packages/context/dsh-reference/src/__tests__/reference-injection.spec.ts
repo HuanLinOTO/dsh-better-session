@@ -4,7 +4,7 @@ import type { PreStepDecision } from "@deepseek-ai/dsh-agent";
 import type { UserMessage } from "@deepseek-ai/dsh-session";
 import type { SkillDefinition } from "@deepseek-ai/dsh-skill";
 import { apply } from "../index.ts";
-import { fileReferencesIn, skillNamesIn } from "../links.ts";
+import { fileReferencesIn, skillNamesIn } from "../index.ts";
 
 type Listener = (
   payload: {

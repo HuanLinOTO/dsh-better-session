@@ -1,0 +1,45 @@
+name: pack-artifacts
+
+# Local-build helper on the fork: runs the standard Linux build pipeline and
+# uploads the packed tarballs of the profile-facing packages as an artifact.
+# Windows checkouts of this repo currently emit broken dists (relative source
+# modules dropped from bundles); this workflow provides trustworthy tarballs.
+on:
+  push:
+    branches:
+      - ci/pack-artifacts
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+
+      - run: just prepare
+      - run: just build
+
+      - name: Pack profile-facing packages
+        run: |
+          mkdir -p out
+          for p in \
+            packages/bundles/better-session \
+            packages/session/session-rdb \
+            packages/session/session-branch \
+            packages/session/ui-conversation-manager \
+            packages/session/ui-conversation-message-actions \
+            packages/context/dsh-reference \
+            packages/client/dsh-client-ui-primitives; do
+            (cd "$p" && pnpm pack --pack-destination ../../out)
+          done
+          ls -l out/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: morlay-alpha5-tarballs
+          path: out/
+          if-no-files-found: error

@@ -40,6 +40,7 @@
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
+    "@morlay/dsh-client-ui-primitives": "workspace:*",
     "mdast-util-from-markdown": "^2.0.2"
   },
   "devDependencies": {
