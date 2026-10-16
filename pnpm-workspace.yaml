@@ -8,6 +8,11 @@ packages:
   - packages/*/*
   - apps/*
 
+# 开发时 workspace 依赖走链接：改源码立即生效，不必重装。
+#
+# **打包不受它影响**：`dshdev` 的 deploy 步骤用 `--config.inject-workspace-packages=true` 覆盖它——deploy
+# 要的是"按内容装进去"的自包含闭包（链接指回仓库，换机器就断）。别在 deploy 之后再加"补装/逐个实体化"
+# 那类步骤：pnpm 原生一次就做完了（见 `devpackages/dshdev/src/cli/prepare-seed.ts` 的 `deployClosure`）。
 linkWorkspacePackages: true
 hoistWorkspacePackages: true
 autoInstallPeers: true

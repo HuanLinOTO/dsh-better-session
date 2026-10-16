@@ -214,7 +214,7 @@ importers:
         version: 18.3.1
       jsdom:
         specifier: ^30.1.2
-        version: 30.1.2(@noble/hashes@2.4.0)
+        version: 30.1.3(@noble/hashes@2.4.0)
       oxfmt:
         specifier: ^0.72.0
         version: 0.72.0
@@ -247,7 +247,7 @@ importers:
         version: 6.1.1(supports-color@9.4.0)(typescript@7.0.2)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       vitest:
         specifier: 5.x
-        version: 5.0.4(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       zx:
         specifier: ^8.8.5
         version: 8.8.5
@@ -339,15 +339,21 @@ importers:
       '@deepseek-ai/dsh-app-boot':
         specifier: workspace:*
         version: link:../../vendor/deepseek-harness/packages/boot/app-boot
+      '@morlay/dsh-desktop-host':
+        specifier: workspace:*
+        version: link:../../packages/desktop/dsh-desktop-host
       '@morlay/dsh-desktop-shell':
         specifier: workspace:*
         version: link:../../packages/desktop/dsh-desktop-shell
+      '@morlay/dsh-oxc-node':
+        specifier: workspace:*
+        version: link:../../packages/boot/dsh-oxc-node
       commander:
         specifier: ^15.0.0
         version: 15.0.0
       electron:
-        specifier: ^44.3.0
-        version: 44.7.2(supports-color@9.4.0)
+        specifier: 44.7.0
+        version: 44.7.0(supports-color@9.4.0)
       electron-builder:
         specifier: ^26.16.1
         version: 26.17.0(electron-builder-squirrel-windows@26.17.0)(supports-color@9.4.0)
@@ -376,9 +382,6 @@ importers:
       '@local/devkit':
         specifier: workspace:*
         version: link:../devkit
-      '@local/oxc-node':
-        specifier: workspace:^
-        version: link:../oxc-node
       '@local/tsdown-plugin-cordis':
         specifier: workspace:*
         version: link:../tsdown-plugin-cordis
@@ -410,17 +413,11 @@ importers:
         specifier: 7.x
         version: 7.0.2
 
-  devpackages/oxc-node:
-    dependencies:
-      '@oxc-project/runtime':
-        specifier: ^0.154.0
-        version: 0.154.0
-      oxc-transform:
-        specifier: ^0.154.0
-        version: 0.154.0
-
   devpackages/tsdown-plugin-cordis:
     dependencies:
+      '@morlay/dsh-cordis-assets':
+        specifier: workspace:*
+        version: link:../../packages/tooling/dsh-cordis-assets
       tsdown:
         specifier: 0.23.x
         version: 0.23.1(tsx@4.23.15)(typescript@7.0.2)
@@ -468,6 +465,46 @@ importers:
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.5
+
+  packages/boot/dsh-app-boot:
+    dependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/deepseek-harness/vendor/cordis
+      '@deepseek-ai/dsh-app-boot':
+        specifier: workspace:^
+        version: link:../../../vendor/deepseek-harness/packages/boot/app-boot
+      '@deepseek-ai/dsh-cmdline':
+        specifier: workspace:^
+        version: link:../../../vendor/deepseek-harness/packages/boot/cmdline
+      '@deepseek-ai/dsh-home-paths':
+        specifier: workspace:^
+        version: link:../../../vendor/deepseek-harness/packages/util/home-paths
+      '@deepseek-ai/dsh-http-proxy':
+        specifier: workspace:^
+        version: link:../../../vendor/deepseek-harness/packages/util/http-proxy
+      '@deepseek-ai/dsh-launch-environment':
+        specifier: workspace:^
+        version: link:../../../vendor/deepseek-harness/packages/util/launch-environment
+    devDependencies:
+      '@local/devkit':
+        specifier: workspace:*
+        version: link:../../../devpackages/devkit
+      '@local/tsdown-plugin-cordis':
+        specifier: workspace:*
+        version: link:../../../devpackages/tsdown-plugin-cordis
+      '@types/node':
+        specifier: ^26.5.0
+        version: 26.6.5
+
+  packages/boot/dsh-oxc-node:
+    dependencies:
+      '@oxc-project/runtime':
+        specifier: ^0.154.0
+        version: 0.154.0
+      oxc-transform:
+        specifier: ^0.154.0
+        version: 0.154.0
 
   packages/bundles/better-session:
     dependencies:
@@ -571,9 +608,9 @@ importers:
       '@deepseek-ai/dsh-host-webserver':
         specifier: workspace:^
         version: link:../../../vendor/deepseek-harness/packages/host/webserver
-      '@local/tsdown-plugin-cordis':
+      '@morlay/dsh-cordis-assets':
         specifier: workspace:*
-        version: link:../../../devpackages/tsdown-plugin-cordis
+        version: link:../../tooling/dsh-cordis-assets
       '@oxc-project/runtime':
         specifier: ^0.153.0
         version: 0.153.0
@@ -749,15 +786,9 @@ importers:
 
   packages/desktop/dsh-desktop-host:
     dependencies:
-      '@deepseek-ai/dsh':
-        specifier: workspace:^
-        version: link:../../../vendor/deepseek-harness/apps/cli
       '@deepseek-ai/dsh-api-gateway':
         specifier: workspace:*
         version: link:../../../vendor/deepseek-harness/packages/api/gateway
-      '@deepseek-ai/dsh-app-boot':
-        specifier: workspace:^
-        version: link:../../../vendor/deepseek-harness/packages/boot/app-boot
       '@deepseek-ai/dsh-client-connection':
         specifier: workspace:*
         version: link:../../../vendor/deepseek-harness/packages/client/connection
@@ -767,9 +798,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: workspace:^
         version: link:../../../vendor/deepseek-harness/vendor/schemastery
-      '@local/oxc-node':
+      '@morlay/dsh-app-boot':
         specifier: workspace:*
-        version: link:../../../devpackages/oxc-node
+        version: link:../../boot/dsh-app-boot
       '@morlay/dsh-client-modules':
         specifier: workspace:*
         version: link:../../client/dsh-client-modules
@@ -808,10 +839,10 @@ importers:
         specifier: workspace:*
         version: link:../../../vendor/deepseek-harness/packages/boot/app-boot
       '@deepseek-ai/dsh-atomic-write':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../vendor/deepseek-harness/packages/util/atomic-write
       '@deepseek-ai/dsh-client-shortcuts':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../../vendor/deepseek-harness/packages/client/shortcuts
       '@deepseek-ai/dsh-util-crypto':
         specifier: workspace:*
@@ -819,16 +850,10 @@ importers:
       '@deepseek-ai/dsh-util-values':
         specifier: workspace:*
         version: link:../../../vendor/deepseek-harness/packages/util/values
-      '@local/oxc-node':
-        specifier: workspace:*
-        version: link:../../../devpackages/oxc-node
       '@morlay/dsh-desktop-host':
         specifier: workspace:*
         version: link:../dsh-desktop-host
     devDependencies:
-      '@deepseek-ai/dsh':
-        specifier: workspace:*
-        version: link:../../../vendor/deepseek-harness/apps/cli
       '@local/devkit':
         specifier: workspace:*
         version: link:../../../devpackages/devkit
@@ -839,17 +864,17 @@ importers:
         specifier: ^26.5.0
         version: 26.6.5
       electron:
-        specifier: ^44.3.0
-        version: 44.7.2(supports-color@9.4.0)
+        specifier: 44.7.0
+        version: 44.7.0(supports-color@9.4.0)
 
   packages/llm/llm-openai-compatible:
     dependencies:
       '@ai-sdk/openai-compatible':
         specifier: ^3.0.32
-        version: 3.0.69(zod@4.6.5)
+        version: 3.0.70(zod@4.6.5)
       '@ai-sdk/provider':
         specifier: ^4.0.7
-        version: 4.0.27
+        version: 4.0.28
       '@deepseek-ai/cordis':
         specifier: workspace:^
         version: link:../../../vendor/deepseek-harness/vendor/cordis
@@ -1424,6 +1449,16 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.6.5
+
+  packages/tooling/dsh-cordis-assets:
+    dependencies:
+      lightningcss:
+        specifier: ^1.30.2
+        version: 1.33.0
+    devDependencies:
+      rolldown:
+        specifier: ^1.0.0-beta.45
+        version: 1.2.14
 
   packages/web/dsh-web-search-ollama:
     dependencies:
@@ -4041,7 +4076,7 @@ importers:
         version: link:../../../vendor/schemastery
       '@tanstack/react-virtual':
         specifier: ^3.14.10
-        version: 3.14.19(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        version: 3.14.20(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react:
         specifier: 18.x
         version: 18.3.1
@@ -6141,7 +6176,7 @@ importers:
         version: link:../../util/values
       '@tanstack/react-virtual':
         specifier: ^3.14.10
-        version: 3.14.19(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        version: 3.14.20(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       diff:
         specifier: ^9.0.0
         version: 9.0.0
@@ -7812,7 +7847,7 @@ importers:
         version: link:../../core/session
       '@tanstack/react-virtual':
         specifier: ^3.14.10
-        version: 3.14.19(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        version: 3.14.20(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react:
         specifier: 18.x
         version: 18.3.1
@@ -9351,7 +9386,7 @@ importers:
         version: link:../../../vendor/schemastery
       '@earendil-works/pi-ai':
         specifier: 1.0.2
-        version: 1.0.2(patch_hash=1cc211bc358d30cb58bd975f39c03e296f8a277c3de845514d12f9ae77ebab5f)(@aws-sdk/credential-provider-node@3.972.86)(@modelcontextprotocol/sdk@1.32.1(supports-color@9.4.0)(zod@4.6.5))(@smithy/signature-v4@5.7.4)(supports-color@9.4.0)(undici@8.12.1)(ws@8.22.0)(zod@4.6.5)
+        version: 1.0.2(patch_hash=1cc211bc358d30cb58bd975f39c03e296f8a277c3de845514d12f9ae77ebab5f)(@aws-sdk/credential-provider-node@3.972.86)(@modelcontextprotocol/sdk@1.32.1(supports-color@9.4.0)(zod@4.6.5))(@smithy/signature-v4@5.7.4)(supports-color@9.4.0)(undici@8.12.2)(ws@8.22.0)(zod@4.6.5)
 
   vendor/deepseek-harness/packages/llm/llm-retry:
     dependencies:
@@ -11754,7 +11789,7 @@ importers:
         version: 18.3.1(react@18.3.1)
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   vendor/deepseek-harness/packages/test-support/llm-mock-server:
     dependencies:
@@ -11823,7 +11858,7 @@ importers:
         version: link:../../typert/protocol
       '@vitest/spy':
         specifier: ^4.1.11
-        version: 4.1.11
+        version: 4.1.12
 
   vendor/deepseek-harness/packages/test-support/session-snapshot:
     dependencies:
@@ -11856,7 +11891,7 @@ importers:
         version: 4.3.2
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   vendor/deepseek-harness/packages/todo/tool-todo:
     dependencies:
@@ -11985,7 +12020,7 @@ importers:
         version: link:../../../vendor/cordis
       undici:
         specifier: ^8.10.2
-        version: 8.12.1
+        version: 8.12.2
 
   vendor/deepseek-harness/packages/util/launch-environment:
     dependencies:
@@ -12105,7 +12140,7 @@ importers:
         version: 2.5.0
       undici:
         specifier: ^8.10.2
-        version: 8.12.1
+        version: 8.12.2
 
   vendor/deepseek-harness/packages/web/web-search-deepseek:
     dependencies:
@@ -12407,20 +12442,20 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
-  '@ai-sdk/openai-compatible@3.0.69':
-    resolution: {integrity: sha512-ZPlhJrmmaOTsOvHbiM34FNC9f3tovn6vDZHNzsFOUHOKFlXh3nk+0k4lOe43Yb0Di7MdAyi70wkDPfzfP2lodw==}
+  '@ai-sdk/openai-compatible@3.0.70':
+    resolution: {integrity: sha512-0TefLzj+V7aMLrIIKdk3CKRji+hOu3oOSHeLKJVzr0+q/7rsH4Q56w6RK7GX7csmAd9Urtt097XBTkBwJbpDjA==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider-utils@5.0.60':
-    resolution: {integrity: sha512-Tw56Xw8RdmWH30RuWdYrBK+XvJWwTlBre8v1ARH8oNyzC6xxDNB/ss0yzQbO3hkP+sdtvZH10RIAFP1GwjWGgw==}
+  '@ai-sdk/provider-utils@5.0.61':
+    resolution: {integrity: sha512-Y+Z3539UXw0ctFDNepTtG23VqBQHr2A6yI2qUxvQcg75DJYgJoD2F9U2Vp5OgQjX7lxto1BLgFtKuOhzrr52vQ==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider@4.0.27':
-    resolution: {integrity: sha512-TtWwm6SxFiPomlMIbTQa+yhJte+w4/oCsW+wJrJzMC3MqHpAY9e5dJF1Y4HxyKt3W2Csac0KiI76Ckio11TFYw==}
+  '@ai-sdk/provider@4.0.28':
+    resolution: {integrity: sha512-6ThcmkJQXSMlBrf6mirIjUUS04Q5/kApbYTOzd5lZfYXLa1XPpnDLxP/G96/DKc00fDIUOW9S2ls0mSzb0+l9w==}
     engines: {node: '>=22'}
 
   '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.263':
@@ -12497,8 +12532,8 @@ packages:
     resolution: {integrity: sha512-jCpAvj8apa7SKHZYogk0rbXB3Kb0hLFrpkWF+Ap+vBA5rirItnpv9NKyAyEuDuFizvl0qwnj6JWR70RGJ0rOlw==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
 
-  '@asamuzakjp/dom-selector@9.2.4':
-    resolution: {integrity: sha512-YnVzxDxLaqL0t7Q4wfcgHZjg55Wm6y5EaO7Bhu3q9J7wq/8iw3PhsnWiOQhYekx4VexnbkgWpTT6n+QIV7kczw==}
+  '@asamuzakjp/dom-selector@10.0.3':
+    resolution: {integrity: sha512-3+777rEPsOOjoy5/sRmIzHnoRDaLpm3XWY2dmWn/N7f/XwDG0bcpnFaKL3X9FYJUbNwLmpcJC1bUYexJRxsFlw==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
 
   '@aws-sdk/client-bedrock-runtime@3.1127.0':
@@ -12686,8 +12721,8 @@ packages:
     engines: {node: '>=22.19.0'}
     hasBin: true
 
-  '@earendil-works/pi-telemetry@1.2.0':
-    resolution: {integrity: sha512-NZ3aJE6dr7aTgzzXDe53OW7BsAsF8ZUKHPJTtnjaQcxtlagkUT0Ew8Qas0EvYQsZqR/KpF1lB+z209XBzIC7xg==}
+  '@earendil-works/pi-telemetry@1.3.0':
+    resolution: {integrity: sha512-ERGZr+aXjNJzoUbB7ZzHVH3g5otzMHjHLs2Fyizm12By5X+gBEhod9cJXFOk13S7M8a29Am+Mq21zm73mRJFLg==}
     engines: {node: '>=22.19.0'}
 
   '@electron-internal/extract-zip@1.0.5':
@@ -14913,14 +14948,14 @@ packages:
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
 
-  '@tanstack/react-virtual@3.14.19':
-    resolution: {integrity: sha512-zmVdJO8DDqHphZ2H6SnTmgpVXcUy5DprB+clZF0ik679/d0MQ1UPEb2jtaX6F5VTAX4o3ozSLQaRCnybS2KYLA==}
+  '@tanstack/react-virtual@3.14.20':
+    resolution: {integrity: sha512-9hbhFlc0lznjXmWYDB/KEl7PJxEPz0Qnj2FzJFse98miGvXtx7jzjE5jlasmtczmZ6TxXsyI4v7PuyGQm2q1nQ==}
     peerDependencies:
       react: 18.x
       react-dom: 18.x
 
-  '@tanstack/virtual-core@3.19.4':
-    resolution: {integrity: sha512-ygZ3O99Il18dl0gG0q7sH78iSkb96F07G+xK9V83eCgV8NQbcNd7R+cgcJJMFO7llBoebd0A82sCCstQq2Vp6Q==}
+  '@tanstack/virtual-core@3.19.5':
+    resolution: {integrity: sha512-X/wq6DtSK/XClznMM+I4JE63yyIwmyPk4Ts83bD0VKaIbwHNdRsO5QipCPX+3OovqYyr0puQNpbmp8+SPhspNg==}
 
   '@testing-library/dom@10.4.2':
     resolution: {integrity: sha512-yzr2S9HyAIdhz2/6qHgbs665Q7PKVcDF05vsOlHPxG1mo36gKVesdYVeDLnXgfjJ03CrKRk08knc6+E/9m8v2Q==}
@@ -15245,11 +15280,11 @@ packages:
   '@ungap/structured-clone@1.4.0':
     resolution: {integrity: sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==}
 
-  '@vitest/expect@4.1.11':
-    resolution: {integrity: sha512-VX2x5vNJXET47KAFzwERI+KRMtTTCSWTfSMKsW7JsUsXV4psq++e3DvZpuTDOpHcxytiDs6p2nhVb2tVDiiUYw==}
+  '@vitest/expect@4.1.12':
+    resolution: {integrity: sha512-vFlTt+YEu9WBpNjdGayNmlMVzrWPi1+sv853/7t2FU7hpO5gAFBKHzQmkCq5Xjpr+evegF2994LQT3hF3mRlqQ==}
 
-  '@vitest/mocker@4.1.11':
-    resolution: {integrity: sha512-2XJVD55d1o5AZous5CCGKS74g/riOj9odEt2bQpCVZeblHyHdnMeFl4jl0XjU21stf4mbjUkew2eXQZt65g5CQ==}
+  '@vitest/mocker@4.1.12':
+    resolution: {integrity: sha512-fKShNpKZzupWZuY0z7egydvL0sqW4INEZBEExMBMAa6izlENEVHwoXgdaTCaBZ5fwlr4xf2o1wXC83n9RpO+NA==}
     peerDependencies:
       msw: ^2.4.9
       vite: ^6.0.0 || ^7.0.0 || ^8.0.0
@@ -15259,8 +15294,8 @@ packages:
       vite:
         optional: true
 
-  '@vitest/mocker@5.0.4':
-    resolution: {integrity: sha512-tqAlrYWce4iUxhr3ncNohejtCTOcHeE8XWrSNZY3OhPoDn01yeGv+gnaBy64ATp7o6pb03eIbBAjzmibpc9vIQ==}
+  '@vitest/mocker@5.0.5':
+    resolution: {integrity: sha512-xLL3lkDegJZw+MGoGaCCsFayDZthGgpAtr3Vziyfc4p7xH89K7KRPcRBBh/kEYm0Aqkt5DtTmkYpBtRV/FrHZg==}
     peerDependencies:
       msw: ^2.4.9 || ^3.0.0
       vite: ^6.0.0 || ^7.0.0 || ^8.0.0
@@ -15270,23 +15305,23 @@ packages:
       vite:
         optional: true
 
-  '@vitest/pretty-format@4.1.11':
-    resolution: {integrity: sha512-yiZzPbGTS9Sr/JpFl8zHrcIkAofNbFV6k21vIgQN/cY/oxZeXhJv5sc/MBJ5jFKWmWs+oJHw0UXLZjmf931+Vw==}
+  '@vitest/pretty-format@4.1.12':
+    resolution: {integrity: sha512-XW9O8+Mxx4VpCtkYdMJLZQQwsVryP9wk7cPKDxtXFfwSak6yRh5+2fep/Y0XF/ElBvJHq8bcYdi6aeuai0opZA==}
 
-  '@vitest/runner@4.1.11':
-    resolution: {integrity: sha512-LztvUgdwMNJMIkj3hQnnxiC2Xy1zNxq928W/xhjCLaNCzqTZOudjwbQf6v9IntZGPw132i2Lq2rgTRZHD3JHNw==}
+  '@vitest/runner@4.1.12':
+    resolution: {integrity: sha512-NKlVKCr5QnCe8jijdMnmkpHHU+WTqiLFR6G0pHji9uRjXK9xJl1k1nTw6F3pOOj2PDcsDt2GKQMI7wIsaT491w==}
 
-  '@vitest/snapshot@4.1.11':
-    resolution: {integrity: sha512-pN7ikn1ON7h8ee4gIAp4AzyK+zBtJPzVbqOgu5LCEh4VaJVbPQcgYQYJIMGQPXVeJJq1fnfazis7a5pFNPahog==}
+  '@vitest/snapshot@4.1.12':
+    resolution: {integrity: sha512-ko1y1Qgb/slzQ9mr+b89Cuqud8WG1TKtsPD8r7ZUBdvVOGt85Af2HwCqHujrhwJq95hs/9RM7fcAPg57o1vlzw==}
 
-  '@vitest/spy@4.1.11':
-    resolution: {integrity: sha512-apNa/prQy2qCeywhnixOHPRCgGNhvg7T4Dapfl1GahLp/R+uhBm5cPyFoNVyqsNd2h1nJxL6BqqdIjiABL60YA==}
+  '@vitest/spy@4.1.12':
+    resolution: {integrity: sha512-RGq9x4JNGNTZHEJxvN0oSiJjeSCExm0n2gZKKJZHY9cX5AVA6M7VJILBT3ZJ/tJ/0J9uWT7fETV9/btoi//vSg==}
 
-  '@vitest/spy@5.0.4':
-    resolution: {integrity: sha512-MZKk/gSkm2q+ICobMxCpH1mA+cCAWm8WV7UhxlqGjq/sJ3AGc1BqFOs5CRVXxH78wQtme9q/NAAgBquj4AcyMw==}
+  '@vitest/spy@5.0.5':
+    resolution: {integrity: sha512-lwJRExuH417257Q5wv9QYugN9IMJkoxcrKrYxGPQkBzl7wlNpTUxD/5yNX4ESKVUIShKPgkGchYPFMWOOk0wzw==}
 
-  '@vitest/utils@4.1.11':
-    resolution: {integrity: sha512-zTCVGpyFsGWBhllOyKlTw/vnr6D9qxsfSDyfbyZmTyjHw5N/VuvzHpHoQjm2ZJzn4RJgx5w4r7V0er69CmLgPQ==}
+  '@vitest/utils@4.1.12':
+    resolution: {integrity: sha512-Q3awXrwOfEV+qc3WmO5ONyE0yO7Q1gQ9/oyHxGLZ/pl7N3NO/ZztqQwKLuwMkV+CA1JYSIeO3gkHnRDIo4AVaA==}
 
   '@vscode/ripgrep-darwin-arm64@1.18.0':
     resolution: {integrity: sha512-r3ktHSvbFycQNF6sl7sNDPocpsI7J+mEzh1IaZFkY0spm3k2Z9t8hPAeOK7+p0l6p6/swkQC14XWX01low+94Q==}
@@ -16263,6 +16298,11 @@ packages:
     resolution: {integrity: sha512-bO3y10YikuUwUuDUQRM4KfwNkKhnpVO7IPdbsrejwN9/AABJzzTQ4GeHwyzNSrVO+tEH3/Np255a3sVZpZDjvg==}
     engines: {node: '>=8.0.0'}
 
+  electron@44.7.0:
+    resolution: {integrity: sha512-aUq9/zLAAFYc+a9gy6cd0C3Y/N/RmovLCD8TV8LhIzNhuND6HEgsu96jJz9cbAxvckSPv+Trf2PKEjktoZgFkw==}
+    engines: {node: '>= 22.12.0'}
+    hasBin: true
+
   electron@44.7.2:
     resolution: {integrity: sha512-u3Pbz0Hi1sSSwBMz2v8LiagsfUG4QURPUe/qphM+g4THKP8o4BYdnuboyhlLO8HIC/KfV5rvltyacbP4jEq9yw==}
     engines: {node: '>= 22.12.0'}
@@ -16973,8 +17013,8 @@ packages:
   jsbn@0.1.1:
     resolution: {integrity: sha512-UVU9dibq2JcFWxQPA6KCqj5O42VOmAY3zQUfEKxU0KpTGXwNoCjkX1e13eHNvw/xPynt6pU0rZ1htjWTNTSXsg==}
 
-  jsdom@30.1.2:
-    resolution: {integrity: sha512-0FFE/jE1rppmVfUrJUgxqXjcwolZYIGtAgj1pTussMhNZxIxi7W/PvfWaMNroGi2B36X1IKHbexpZ9DhkoOPiQ==}
+  jsdom@30.1.3:
+    resolution: {integrity: sha512-hQMUPvRgN7KxsfIytDQji7bimuJeRQa6Qo5+iuiZQk5CafeRxLIA10/cG5YCBFNpD9RO3oqIiN4CO1Y44kxqXg==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
     peerDependencies:
       canvas: ^3.2.3
@@ -17459,8 +17499,8 @@ packages:
     resolution: {integrity: sha512-NMPBRMJgiQHjbd8phG3Vebdx4kZ1H121rbl5IkMqeOsahptB9BKo/d7oJ3zTXqTgagn2bWlNSXkh0QUGM31RYg==}
     engines: {node: '>=18'}
 
-  node-abi@4.37.0:
-    resolution: {integrity: sha512-O9XXMXLeRHQtvh43NCah3y9N1K69tecOmu8Y5p2ay4iXvtpbQr0VaroJF9EmRVp3vkdoj3qn4IFfX+ZYtC94fw==}
+  node-abi@4.38.0:
+    resolution: {integrity: sha512-suSdznUPfabdaeLiNERA0LHod14RhcEn8wMPUZEQ6bKvajUCZ+aizY4pIvlLU+gImeLKp2bFDHhOc9yonISsXw==}
     engines: {node: '>=22.12.0'}
 
   node-addon-api@7.1.1:
@@ -18660,16 +18700,16 @@ packages:
   undici-types@8.9.0:
     resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
-  undici@6.29.0:
-    resolution: {integrity: sha512-R+RODBqp6i2pPflGdq+xIOUkl+RNfGgHwoinecKu/JCuf2uO06cOKoDbI2P7Dn6KcswdKwrczbU6IYJ6K8X+wg==}
+  undici@6.29.1:
+    resolution: {integrity: sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==}
     engines: {node: '>=18.17'}
 
-  undici@7.30.0:
-    resolution: {integrity: sha512-dkrQXeHSaoamnItlYbmzG0wFYrM0ZwDxCIg0A7aKjTyyhh9svRzCNFEzV+Vm05/yehjCzjDZ31KXfGEjYSztDQ==}
+  undici@7.30.1:
+    resolution: {integrity: sha512-03KrMbjIFDWQR5RNPrSw3bd1r12JpyFQl9/yxjUbJtqkjmllqC5lFjZh6ujeuJCKr8EOQvRW872Oy/az+nLYxg==}
     engines: {node: '>=20.18.1'}
 
-  undici@8.12.1:
-    resolution: {integrity: sha512-usz3OVQBeh1LxNn0DzU0voLXMgn5CU/WUdpBsY6Ti5afNao+vTkmn4H/NxoXolc10cOqe2+YIG0Hspq2rsl64w==}
+  undici@8.12.2:
+    resolution: {integrity: sha512-XtuDWVdqTLr3NAxm2ly9/hU6kUsJOgGh1RASzMBbsw6aWCOaQzHdW+QQDfdERjfJ2V5vL5pRPa4RetO9UfivDg==}
     engines: {node: '>=22.19.0'}
 
   unicode-properties@1.4.1:
@@ -18846,20 +18886,20 @@ packages:
       yaml:
         optional: true
 
-  vitest@4.1.11:
-    resolution: {integrity: sha512-fhACrNXUidIbGSBr5FlbuBkO7VWC1ZyLl0DO4CU2DrQoAPxX84Ysxs+HeGQpii5lZWV1Q4gBZTTu49mF+A6Edw==}
+  vitest@4.1.12:
+    resolution: {integrity: sha512-5eWdz2yb3ajxWF3C8C4TjkXl7FGm3n2E/VlazALrQHzK7nYMSGFnCZto0bbPNl77AwkOZVLk0YnBAejUu0NiWA==}
     engines: {node: ^20.0.0 || ^22.0.0 || >=24.0.0}
     hasBin: true
     peerDependencies:
       '@edge-runtime/vm': '*'
       '@opentelemetry/api': ^1.9.0
       '@types/node': ^20.0.0 || ^22.0.0 || >=24.0.0
-      '@vitest/browser-playwright': 4.1.11
-      '@vitest/browser-preview': 4.1.11
-      '@vitest/browser-webdriverio': 4.1.11
-      '@vitest/coverage-istanbul': 4.1.11
-      '@vitest/coverage-v8': 4.1.11
-      '@vitest/ui': 4.1.11
+      '@vitest/browser-playwright': 4.1.12
+      '@vitest/browser-preview': 4.1.12
+      '@vitest/browser-webdriverio': ^4.1.11
+      '@vitest/coverage-istanbul': 4.1.12
+      '@vitest/coverage-v8': 4.1.12
+      '@vitest/ui': 4.1.12
       happy-dom: '*'
       jsdom: '*'
       vite: ^6.0.0 || ^7.0.0 || ^8.0.0
@@ -18887,20 +18927,20 @@ packages:
       jsdom:
         optional: true
 
-  vitest@5.0.4:
-    resolution: {integrity: sha512-z0WxZRV2Sg48wF0FSgMq3TFG8JS38/Qr96vZVZdX6+Em9raQTvnXQvdTFJe2m3rfyJnEHeHQ/snceIdi8D1pVg==}
+  vitest@5.0.5:
+    resolution: {integrity: sha512-cPODOMF8YnkiiYtDdHo6n4wWmBrOBBbOIYH2d33M4l3CdNn72h+qMmO6uXffUN6A5AZFXNND/d+krS9mgkXRfg==}
     engines: {node: ^22.12.0 || ^24.0.0 || >=26.0.0}
     hasBin: true
     peerDependencies:
       '@edge-runtime/vm': '*'
       '@opentelemetry/api': ^1.9.0
       '@types/node': ^22.0.0 || >=24.0.0
-      '@vitest/browser-playwright': 5.0.4
-      '@vitest/browser-preview': 5.0.4
+      '@vitest/browser-playwright': 5.0.5
+      '@vitest/browser-preview': 5.0.5
       '@vitest/browser-webdriverio': ^5.0.0-beta.5 || >=5.0.0
-      '@vitest/coverage-istanbul': 5.0.4
-      '@vitest/coverage-v8': 5.0.4
-      '@vitest/ui': 5.0.4
+      '@vitest/coverage-istanbul': 5.0.5
+      '@vitest/coverage-v8': 5.0.5
+      '@vitest/ui': 5.0.5
       happy-dom: '*'
       jsdom: '*'
       vite: ^6.4.0 || ^7.0.0 || ^8.0.0
@@ -19162,22 +19202,22 @@ snapshots:
     dependencies:
       zod: 4.6.5
 
-  '@ai-sdk/openai-compatible@3.0.69(zod@4.6.5)':
+  '@ai-sdk/openai-compatible@3.0.70(zod@4.6.5)':
     dependencies:
-      '@ai-sdk/provider': 4.0.27
-      '@ai-sdk/provider-utils': 5.0.60(zod@4.6.5)
+      '@ai-sdk/provider': 4.0.28
+      '@ai-sdk/provider-utils': 5.0.61(zod@4.6.5)
       zod: 4.6.5
 
-  '@ai-sdk/provider-utils@5.0.60(zod@4.6.5)':
+  '@ai-sdk/provider-utils@5.0.61(zod@4.6.5)':
     dependencies:
-      '@ai-sdk/provider': 4.0.27
+      '@ai-sdk/provider': 4.0.28
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
-      undici: 7.30.0
+      undici: 7.30.1
       zod: 4.6.5
 
-  '@ai-sdk/provider@4.0.27':
+  '@ai-sdk/provider@4.0.28':
     dependencies:
       json-schema: 0.4.0
 
@@ -19241,7 +19281,7 @@ snapshots:
       '@csstools/css-tokenizer': 4.0.2
       lru-cache: 11.5.3
 
-  '@asamuzakjp/dom-selector@9.2.4':
+  '@asamuzakjp/dom-selector@10.0.3':
     dependencies:
       bidi-js: 1.1.0
       css-tree: 3.2.1
@@ -19528,16 +19568,16 @@ snapshots:
 
   '@drizzle-team/brocli@0.12.1': {}
 
-  '@earendil-works/pi-ai@1.0.2(patch_hash=1cc211bc358d30cb58bd975f39c03e296f8a277c3de845514d12f9ae77ebab5f)(@aws-sdk/credential-provider-node@3.972.86)(@modelcontextprotocol/sdk@1.32.1(supports-color@9.4.0)(zod@4.6.5))(@smithy/signature-v4@5.7.4)(supports-color@9.4.0)(undici@8.12.1)(ws@8.22.0)(zod@4.6.5)':
+  '@earendil-works/pi-ai@1.0.2(patch_hash=1cc211bc358d30cb58bd975f39c03e296f8a277c3de845514d12f9ae77ebab5f)(@aws-sdk/credential-provider-node@3.972.86)(@modelcontextprotocol/sdk@1.32.1(supports-color@9.4.0)(zod@4.6.5))(@smithy/signature-v4@5.7.4)(supports-color@9.4.0)(undici@8.12.2)(ws@8.22.0)(zod@4.6.5)':
     dependencies:
       '@anthropic-ai/sdk': 0.129.0(zod@4.6.5)
       '@aws-sdk/client-bedrock-runtime': 3.1127.0
-      '@earendil-works/pi-telemetry': 1.2.0
+      '@earendil-works/pi-telemetry': 1.3.0
       '@google/genai': 2.21.0(@modelcontextprotocol/sdk@1.32.1(supports-color@9.4.0)(zod@4.6.5))(supports-color@9.4.0)
       '@smithy/node-http-handler': 4.12.1
       http-proxy-agent: 9.1.0(supports-color@9.4.0)
       https-proxy-agent: 9.1.0(supports-color@9.4.0)
-      openai: 7.19.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(undici@8.12.1)(ws@8.22.0)(zod@4.6.5)
+      openai: 7.19.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(undici@8.12.2)(ws@8.22.0)(zod@4.6.5)
       partial-json: 0.1.7
       typebox: 1.3.27
     transitivePeerDependencies:
@@ -19553,7 +19593,7 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-telemetry@1.2.0': {}
+  '@earendil-works/pi-telemetry@1.3.0': {}
 
   '@electron-internal/extract-zip@1.0.5': {}
 
@@ -19592,7 +19632,7 @@ snapshots:
       semver: 7.8.5
       sumchecker: 3.0.1(supports-color@9.4.0)
     optionalDependencies:
-      undici: 7.30.0
+      undici: 7.30.1
     transitivePeerDependencies:
       - supports-color
 
@@ -19619,7 +19659,7 @@ snapshots:
     dependencies:
       '@malept/cross-spawn-promise': 2.0.0
       debug: 4.4.3(supports-color@9.4.0)
-      node-abi: 4.37.0
+      node-abi: 4.38.0
       node-api-version: 0.2.1
       node-gyp: 12.4.0
       read-binary-file-arch: 1.0.6(supports-color@9.4.0)
@@ -21076,13 +21116,13 @@ snapshots:
     dependencies:
       defer-to-connect: 2.0.1
 
-  '@tanstack/react-virtual@3.14.19(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@tanstack/react-virtual@3.14.20(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@tanstack/virtual-core': 3.19.4
+      '@tanstack/virtual-core': 3.19.5
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
 
-  '@tanstack/virtual-core@3.19.4': {}
+  '@tanstack/virtual-core@3.19.5': {}
 
   '@testing-library/dom@10.4.2':
     dependencies:
@@ -21343,55 +21383,55 @@ snapshots:
 
   '@ungap/structured-clone@1.4.0': {}
 
-  '@vitest/expect@4.1.11':
+  '@vitest/expect@4.1.12':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@types/chai': 5.2.3
-      '@vitest/spy': 4.1.11
-      '@vitest/utils': 4.1.11
+      '@vitest/spy': 4.1.12
+      '@vitest/utils': 4.1.12
       chai: 6.3.0
       tinyrainbow: 3.2.0
 
-  '@vitest/mocker@4.1.11(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))':
+  '@vitest/mocker@4.1.12(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))':
     dependencies:
-      '@vitest/spy': 4.1.11
+      '@vitest/spy': 4.1.12
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
       vite: 8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
 
-  '@vitest/mocker@5.0.4(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))':
+  '@vitest/mocker@5.0.5(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
-      '@vitest/spy': 5.0.4
+      '@vitest/spy': 5.0.5
       estree-walker: 3.0.3
       magic-string: 1.4.3
     optionalDependencies:
       vite: 8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
 
-  '@vitest/pretty-format@4.1.11':
+  '@vitest/pretty-format@4.1.12':
     dependencies:
       tinyrainbow: 3.2.0
 
-  '@vitest/runner@4.1.11':
+  '@vitest/runner@4.1.12':
     dependencies:
-      '@vitest/utils': 4.1.11
+      '@vitest/utils': 4.1.12
       pathe: 2.0.3
 
-  '@vitest/snapshot@4.1.11':
+  '@vitest/snapshot@4.1.12':
     dependencies:
-      '@vitest/pretty-format': 4.1.11
-      '@vitest/utils': 4.1.11
+      '@vitest/pretty-format': 4.1.12
+      '@vitest/utils': 4.1.12
       magic-string: 0.30.21
       pathe: 2.0.3
 
-  '@vitest/spy@4.1.11': {}
+  '@vitest/spy@4.1.12': {}
 
-  '@vitest/spy@5.0.4': {}
+  '@vitest/spy@5.0.5': {}
 
-  '@vitest/utils@4.1.11':
+  '@vitest/utils@4.1.12':
     dependencies:
-      '@vitest/pretty-format': 4.1.11
+      '@vitest/pretty-format': 4.1.12
       convert-source-map: 2.0.0
       tinyrainbow: 3.2.0
 
@@ -22277,6 +22317,14 @@ snapshots:
       temp: 0.9.4
     optionalDependencies:
       '@electron/windows-sign': 1.2.2(supports-color@9.4.0)
+    transitivePeerDependencies:
+      - supports-color
+
+  electron@44.7.0(supports-color@9.4.0):
+    dependencies:
+      '@electron-internal/extract-zip': 1.0.5
+      '@electron/get': 5.1.0(supports-color@9.4.0)
+      '@types/node': 24.19.2
     transitivePeerDependencies:
       - supports-color
 
@@ -23206,10 +23254,10 @@ snapshots:
 
   jsbn@0.1.1: {}
 
-  jsdom@30.1.2(@noble/hashes@2.4.0):
+  jsdom@30.1.3(@noble/hashes@2.4.0):
     dependencies:
       '@asamuzakjp/css-color': 7.1.5
-      '@asamuzakjp/dom-selector': 9.2.4
+      '@asamuzakjp/dom-selector': 10.0.3
       '@bramus/specificity': 2.4.3
       '@csstools/css-syntax-patches-for-csstree': 1.1.15(css-tree@3.2.1)
       '@exodus/bytes': 1.16.0(@noble/hashes@2.4.0)
@@ -23222,7 +23270,7 @@ snapshots:
       parse5: 8.0.1
       saxes: 6.0.0
       tough-cookie: 6.0.2
-      undici: 8.12.1
+      undici: 8.12.2
       w3c-xmlserializer: 6.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
@@ -23858,7 +23906,7 @@ snapshots:
     dependencies:
       content-type: 2.1.0
 
-  node-abi@4.37.0:
+  node-abi@4.38.0:
     dependencies:
       semver: 7.8.5
 
@@ -23951,7 +23999,7 @@ snapshots:
       semver: 7.8.5
       tar: 7.5.22
       tinyglobby: 0.2.17
-      undici: 6.29.0
+      undici: 6.29.1
       which: 6.0.1
 
   node-int64@0.4.0: {}
@@ -24025,11 +24073,11 @@ snapshots:
       powershell-utils: 0.2.1
       wsl-utils: 1.0.1
 
-  openai@7.19.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(undici@8.12.1)(ws@8.22.0)(zod@4.6.5):
+  openai@7.19.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(undici@8.12.2)(ws@8.22.0)(zod@4.6.5):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.86
       '@smithy/signature-v4': 5.7.4
-      undici: 8.12.1
+      undici: 8.12.2
       ws: 8.22.0
       zod: 4.6.5
 
@@ -25266,11 +25314,11 @@ snapshots:
 
   undici-types@8.9.0: {}
 
-  undici@6.29.0: {}
+  undici@6.29.1: {}
 
-  undici@7.30.0: {}
+  undici@7.30.1: {}
 
-  undici@8.12.1: {}
+  undici@8.12.2: {}
 
   unicode-properties@1.4.1:
     dependencies:
@@ -25417,15 +25465,15 @@ snapshots:
       tsx: 4.23.15
       yaml: 2.9.1
 
-  vitest@4.1.11(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
+  vitest@4.1.12(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
     dependencies:
-      '@vitest/expect': 4.1.11
-      '@vitest/mocker': 4.1.11(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      '@vitest/pretty-format': 4.1.11
-      '@vitest/runner': 4.1.11
-      '@vitest/snapshot': 4.1.11
-      '@vitest/spy': 4.1.11
-      '@vitest/utils': 4.1.11
+      '@vitest/expect': 4.1.12
+      '@vitest/mocker': 4.1.12(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      '@vitest/pretty-format': 4.1.12
+      '@vitest/runner': 4.1.12
+      '@vitest/snapshot': 4.1.12
+      '@vitest/spy': 4.1.12
+      '@vitest/utils': 4.1.12
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
       magic-string: 0.30.21
@@ -25442,14 +25490,14 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
       '@types/node': 26.6.5
-      jsdom: 30.1.2(@noble/hashes@2.4.0)
+      jsdom: 30.1.3(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - msw
 
-  vitest@5.0.4(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
+  vitest@5.0.5(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.4(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      '@vitest/mocker': 5.0.5(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
       chai: 6.3.0
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -25465,7 +25513,7 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
       '@types/node': 26.6.5
-      jsdom: 30.1.2(@noble/hashes@2.4.0)
+      jsdom: 30.1.3(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - msw
 
