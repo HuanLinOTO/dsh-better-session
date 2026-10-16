@@ -129,14 +129,16 @@ describe("桌面 overlay 的停用清单", () => {
     for (const id of Object.keys(KEPT_ROWS)) expect(disabledIds(patch)).not.toContain(id);
   });
 
-  it("不再替换 webServer，只留 web-runtime 的桌面配置", () => {
+  it("不再替换 webServer；配 web-runtime 与它的随机端口", () => {
     // 以前这里禁掉 `webserver` 并插一个"无端口替身"（请求走字节管道喂进来）。那条路没有 origin，
     // 基于 URL/WS 的东西（settings 的 describe 流、账号的 stream mux、vite 的 HMR）拿不到答复——
-    // 现在照常 listen（随机端口），壳用它的 origin 载入窗口。
+    // 现在照常 listen，壳用它的 origin 载入窗口。
     expect(insertedNames(patch)).toEqual([]);
     expect(disabledIds(patch)).not.toContain("webserver");
-    expect(configuredIds(patch)).toEqual(["web-runtime"]);
-    expect(targetedIds(patch)).toContain("web-runtime");
+    expect(configuredIds(patch).sort()).toEqual(["web-runtime", "webserver"]);
+    // 端口必须随机：上游 `web-app` 给的是 `webStartup.port ?? 3080`，桌面没有 `--port`，于是落到 3080
+    // ——两个实例或本机别的工具占了它，第二次就起不来。
+    expect(portOfWebServer(patch)).toBe(0);
   });
 
   it("停用各归其位：遥测与官方账号实现都在桌面 overlay（写在 bundle 层会被盖回去）", async () => {
@@ -160,3 +162,11 @@ describe("桌面 overlay 的停用清单", () => {
     expect(profile, "profile 档不该出现停用").not.toContain("disabled: true");
   });
 });
+
+/** 桌面 overlay 给 `webserver` 定的端口。 */
+function portOfWebServer(source: string): number | undefined {
+  const row = source.split("\n- id: ").find((chunk) => chunk.startsWith("webserver"));
+  return row === undefined ? undefined : /port: (\d+)/.exec(row)?.[1] === undefined
+    ? undefined
+    : Number(/port: (\d+)/.exec(row)?.[1]);
+}

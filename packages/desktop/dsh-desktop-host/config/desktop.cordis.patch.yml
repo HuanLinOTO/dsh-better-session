@@ -13,6 +13,14 @@
     surfaceContext: false
     trustedHosts: []
 
+# **端口要随机**：`web-app` bundle 给 `webserver` 的默认是 `webStartup.port ?? 3080`，而桌面形态没有
+# `--port` 参数，于是落到 3080——同时开两个实例、或本机上别的工具占了它，第二次就起不来。桌面没有
+# "可预期的地址"要对外（窗口从 origin 载入，地址由宿主自己报），所以向系统要一个：`0`（上游的
+# `webserver` 明确支持："zero requests an OS-assigned port"）。
+- id: webserver
+  config:
+    port: 0
+
 # 桌面档的产品遥测面：上游那两行只在 profile 名为 `desktop` 时激活，靠构建期环境变量 `DSH_CLIENT_VERSION`
 # 填 `serviceVersion`（必填）。自研壳不传那个变量，于是遥测行配置校验失败、`product-analytics` 行 pending，
 # 页面启动时 `productAnalytics/watchPolicy` 那条流拿 502，前端又在非 JSON 响应上抛未捕获错误。
