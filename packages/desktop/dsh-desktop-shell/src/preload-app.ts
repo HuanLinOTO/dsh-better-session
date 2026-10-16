@@ -1,7 +1,6 @@
 import { contextBridge, ipcRenderer, webFrame } from "electron";
 import { markDocumentPlatform, markWindowsTitlebar, syncNativeTheme } from "./document-marks.ts";
 import { DESKTOP_IPC, DESKTOP_SCHEME_ARGUMENT, DESKTOP_WS_PORT_ARGUMENT } from "./ipc.ts";
-import { desktopWebSocketShimCode } from "./page-ws-shim.ts";
 import { createStreamUplink } from "./stream-uplink.ts";
 
 interface StreamChunk {
@@ -22,21 +21,12 @@ const wsPort = process.argv
   .find((argument) => argument.startsWith(`${DESKTOP_WS_PORT_ARGUMENT}=`))
   ?.slice(DESKTOP_WS_PORT_ARGUMENT.length + 1);
 
-if (
-  scheme !== undefined &&
-  scheme !== "" &&
-  location.protocol === `${scheme}:` &&
-  location.hostname === "app"
-) {
+// preload 只在壳里跑（`scheme` 由壳经 argv 传来），所以"是不是桌面形态"看它就够——**不再**要求
+// "页面在 `dsh-custom-next:` 协议下、hostname 是 `app`"：窗口现在从宿主真 webServer 的 origin
+// （`http://127.0.0.1:<port>`）载入，那个条件永远不成立，会让下面这些桌面专用注入整块失效。
+if (scheme !== undefined && scheme !== "") {
 // preload 脚本**跑在页面里**（浏览器没有 cordis 树，也没有壳的日志出口）：这里的 console 是页面日志。
   console.log(`[dsh-shell] preload: scheme=${String(scheme)} wsPort=${String(wsPort)} webFrame=${typeof webFrame}`);
-  if (wsPort !== undefined && wsPort !== "") {
-    // 页面是 web 与桌面共用的，而这条垫片只对桌面形态有意义：在渲染进程最早的一刻把它注入**主 world**
-    // （`WebSocket` 是内建对象，`contextBridge` 覆盖不了，只有主 world 的脚本能换掉它）。
-    void webFrame.executeJavaScript(desktopWebSocketShimCode(Number(wsPort))).catch((error: unknown) => {
-      console.error("[dsh-shell] WebSocket 垫片注入失败", error);
-    });
-  }
   contextBridge.exposeInMainWorld("__DSH_DIRECTORY_PICKER__", {
     pick: () => ipcRenderer.invoke(DESKTOP_IPC.directoryPick) as Promise<string | null>,
   });
