@@ -5,9 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./dts": "./src/dts.ts",
-    "./assets": "./src/assets.ts",
-    "./styles": "./src/styles.ts"
+    "./dts": "./src/dts.ts"
   },
   "devDependencies": {
     "@deepseek-ai/cordis-plugin-include": "workspace:*",
@@ -24,5 +22,8 @@
   "peerDependencies": {
     "tsdown": "0.23.x",
     "typescript": "7.x"
+  },
+  "dependencies": {
+    "@morlay/dsh-cordis-assets": "workspace:*"
   }
 }

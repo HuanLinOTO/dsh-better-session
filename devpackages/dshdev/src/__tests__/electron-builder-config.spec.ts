@@ -25,6 +25,7 @@ describe("desktopBuildConfig", () => {
       icons: {},
       electron: { version: "44.3.0" },
       buildCache: "/build",
+      appWorkspace: "/app",
     });
 
     expect(config.appId).toBe("ai.deepseek.dsh.custom-next");
@@ -33,13 +34,17 @@ describe("desktopBuildConfig", () => {
     expect(config.linux?.executableName).toBe("dsh-custom-next");
     expect(config.electronVersion).toBe("44.3.0");
     expect(config.directories?.output).toBe(join("/build", "artifacts"));
-    // 不用 asar：壳入口是原生 ESM（引导 → `dist/index.mjs`），Electron 的 ESM 加载器在归档里不可靠；
-    // 产物结构与 dev 的装配目录保持一致。
-    expect(config.asar).toBe(false);
+    // **开 asar**：宿主跑的是 Electron 的 node（`ELECTRON_RUN_AS_NODE`），asar 补丁对它照样生效，
+    // 于是整棵依赖树能留在归档里、只有 native 拆出来。判据见
+    // `../.agents/designs/20261016-随包布局：app 进 asar、宿主依赖住 runtime.md`。
+    expect(config.asar).toBe(true);
+    expect(config.asarUnpack).toEqual(["**/*.node"]);
     expect(config.files).toEqual([
       "main.mjs",
       "package.json",
       "src/**",
+      // 构建期打好的 preload（运行时只读它：打包器是 native，读不了 asar 内的源码）。
+      "dist/**",
       "locale/*.json",
     ]);
     expect(config.mac?.target).toEqual(["dir"]);
@@ -53,6 +58,7 @@ describe("desktopBuildConfig", () => {
       icons: { mac: "/icons/icon.icns", linux: "/icons/icon.png", win: "/icons/icon.ico" },
       electron: { version: "44.3.0", dist: "/electron/dist" },
       buildCache: "/build",
+      appWorkspace: "/app",
     });
 
     expect(config.mac?.icon).toBe("/icons/icon.icns");
@@ -60,6 +66,8 @@ describe("desktopBuildConfig", () => {
     expect(config.win?.icon).toBe("/icons/icon.ico");
     expect(config.electronDist).toBe("/electron/dist");
     expect(config.extraResources).toEqual([
+      // profile 的解析面（闭包）不在这里：electron-builder 的忽略规则会吞掉 node_modules，
+      // 它由 `afterPack` 用 `deployClosure` 部署到 `Resources/profile`。
       { from: join("/build", "runtime"), to: "runtime" },
       { from: join("/build", "seed"), to: "seed" },
       { from: join("/build", "runtime", "appconfig.json"), to: "appconfig.json" },

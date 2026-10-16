@@ -1,3 +1,4 @@
+import { logOf } from "@local/devkit/log";
 // CI 的**登录步骤**：把 token 写进全局 `~/.npmrc`（`pnpm publish` 需要认证，且它拒绝脏 working tree，
 // 所以不落在仓库里）。本地别跑它。
 import { writeFile } from "node:fs/promises";
@@ -12,6 +13,8 @@ const REGISTRY_HOST = "npm.pkg.github.com";
  * @param token - 缺省取 `NODE_AUTH_TOKEN`。
  * @returns 进程退出码（0 成功）。
  */
+const log = logOf("dshdev");
+
 export async function runLogin(token?: string): Promise<number> {
   const value = token ?? process.env["NODE_AUTH_TOKEN"];
   if (value === undefined || value === "") {
@@ -19,6 +22,6 @@ export async function runLogin(token?: string): Promise<number> {
     return 1;
   }
   await writeFile(join(homedir(), ".npmrc"), `//${REGISTRY_HOST}/:_authToken=${value}\n`);
-  console.log(`dshdev login: wrote ~/.npmrc for ${REGISTRY_HOST}`);
+  log.info(`wrote ~/.npmrc for ${REGISTRY_HOST}`);
   return 0;
 }

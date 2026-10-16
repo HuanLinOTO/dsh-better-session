@@ -2,12 +2,12 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { rolldown } from "rolldown";
 import type { Plugin } from "rolldown";
-import { clientAssetPlugin, NODE_BUILTIN } from "./assets.ts";
+import { clientAssetPlugin, NODE_BUILTIN } from "@morlay/dsh-cordis-assets/assets";
 import { cssInlinePlugins, type CssAssetPolicy } from "./css.ts";
 
 // 资产那套（mime 表、`?raw`、资产内联/落文件）的 home 在 `@morlay/dsh-client-modules/src/assets.ts`——
 // 运行期现场打包与这里的构建共用一份；下面只把名字转出来，外部 import 面不变。
-export { ASSET_MIME, clientAssetPlugin } from "./assets.ts";
+export { ASSET_MIME, clientAssetPlugin } from "@morlay/dsh-cordis-assets/assets";
 
 // `__ModuleLoader__.load` 手递的三段：banner / intro / footer（构建与现场打包共用）。
 const factoryBanner = (name: string): string =>

@@ -12,10 +12,14 @@
  *   壳在窗口创建前取走；
  * - `package.json`（`main` 指引导）与 `locale/`。
  */
-import { access, cp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { bundlePreload } from "@morlay/dsh-desktop-host/preload-source";
+import { logOf } from "@local/devkit/log";
 import { findWorkspaceRoot, runPnpm } from "./workspace.ts";
+
+const log = logOf("dshdev");
 
 // 壳包根：源码树里那个包（装配的输入）。工具里不写死包名，一律由 node 解析。
 export const SHELL_PACKAGE_ROOT = dirname(
@@ -30,15 +34,6 @@ export interface AssembledShell {
   readonly entry: string;
 }
 
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * 装配壳这一单元（app 目录）。
  *
@@ -51,8 +46,9 @@ export async function prepareShell(workRoot: string): Promise<AssembledShell> {
   const root = join(workRoot, "shell");
   await rm(root, { recursive: true, force: true });
   await mkdir(root, { recursive: true });
+  log.info("shell %o", { "dir": root, "package": "@morlay/dsh-desktop-shell" });
 
-  // 壳这一单元的依赖：**交给 `pnpm deploy`**（`--node-linker=hoisted`：装成真目录、无外链），而不是
+  // 壳这一单元的依赖：**交给 `pnpm deploy`**（扁平解析面，事后由 `linkClosureTopLevel` 挂平），而不是
   // 手写链接或逐个挑包。它要什么由壳包自己的清单说了算（与壳构建时内联的同一份名单）。
   // `pnpm --filter` 要在**工作区根**跑（那里才有 `pnpm-workspace.yaml`）。
   await runPnpm(
@@ -61,23 +57,18 @@ export async function prepareShell(workRoot: string): Promise<AssembledShell> {
       "@morlay/dsh-desktop-shell",
       "deploy",
       "--prod",
-      "--node-linker=hoisted",
       "--ignore-scripts",
       root,
     ],
     await findWorkspaceRoot(SHELL_PACKAGE_ROOT),
   );
+  log.info("shell.ready %o", { "entries": await readdir(root) });
+  // preload 的 CJS 在**这里**打好（运行时只读文件）：打包器是 native 模块，读不了 app.asar 内的源码。
+  const preloadDir = join(root, "dist");
+  await mkdir(preloadDir, { recursive: true });
+  await writeFile(join(preloadDir, "preload.cjs"), await bundlePreload({ shellRoot: root }));
+  log.info("shell.preload %o", { "file": join("dist", "preload.cjs") });
 
-  // `pnpm deploy` 会把自己的配置（含 `pnpm-workspace.yaml`）一并落在 app 目录里；electron-builder 见到
-  // 它会把这个目录当成 workspace root，随后又按它去推导 `package.json` 而失败。这里把它换成"到此为止"
-  // 的那一份（空 `packages`），包遍历就停在这里。
-  await writeFile(join(root, "pnpm-workspace.yaml"), "packages: []\n");
-
-  // 业务源码与本地化：拷过来**不转译**（入口先挂 `ts-register`，Node 就能跑 `node_modules` 下的 `.ts`）。
-  await cp(join(SHELL_PACKAGE_ROOT, "src"), join(root, "src"), { recursive: true });
-  if (await pathExists(join(SHELL_PACKAGE_ROOT, "locale"))) {
-    await cp(join(SHELL_PACKAGE_ROOT, "locale"), join(root, "locale"), { recursive: true });
-  }
   // 入口**自动生成**：Electron 的 app 目录必须有一个真 JS 入口，内容就三件事——报出包根、让 Node 能跑
   // `node_modules` 下的 `.ts`、按**包名**加载业务入口（走本目录清单的 `exports`）。
   const entry = join(root, "main.mjs");

@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./tsconfig.json": "./tsconfig.json",
-    "./patch": "./src/patch.ts"
+    "./patch": "./src/patch.ts",
+    "./log": "./src/log.ts"
   },
   "devDependencies": {
     "@browserbasehq/stagehand": "^4.2.1",
@@ -25,5 +26,9 @@
   "peerDependencies": {
     "tsdown": "0.23.x",
     "typescript": "7.x"
-  }
+  },
+  "files": [
+    "src",
+    "tsconfig.json"
+  ]
 }

@@ -1,3 +1,4 @@
+import { logOf } from "@local/devkit/log";
 // CI 的**发布步骤**（发布一律走 CI；本地别跑它）。
 //
 // 由 `pnpm -r --filter './packages/*/*' --workspace-concurrency=1 exec dshdev publish` 在每个包目录下唤起，
@@ -12,6 +13,8 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_REGISTRY = "https://npm.pkg.github.com/";
 
 /** 稳定版 → latest；`-alpha.*` → alpha；其余预发布（rc / beta / …）→ next。 */
+const log = logOf("dshdev");
+
 export function distTagOf(version: string): string {
   const dash = version.indexOf("-");
   if (dash < 0) return "latest";
@@ -60,13 +63,13 @@ export async function runPublish(options: {
   };
 
   if (!name.startsWith("@morlay/")) {
-    console.log(`skip ${name}: only @morlay/* packages are published from this repo`);
+    log.info(`skip ${name}: only @morlay/* packages are published from this repo`);
     return 0;
   }
 
   const view = await capture("pnpm", ["view", `${name}@${version}`, "version", "--registry", registry]);
   if (view.status === 0) {
-    console.log(`skip ${name}: ${version} already published`);
+    log.info(`skip ${name}: ${version} already published`);
     return 0;
   }
   if (!(view.stderr.includes("ERR_PNPM_PACKAGE_NOT_FOUND") || view.stderr.includes("ERR_PNPM_FETCH_404"))) {
@@ -75,7 +78,7 @@ export async function runPublish(options: {
   }
 
   const tag = distTagOf(version);
-  console.log(`to publish: ${name}@${version} (tag: ${tag})`);
+  log.info(`to publish: ${name}@${version} (tag: ${tag})`);
   const status = await runInherited("pnpm", [
     "publish",
     "--access=public",

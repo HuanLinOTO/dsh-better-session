@@ -1,3 +1,4 @@
+import { logOf } from "@local/devkit/log";
 import { access, cp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -14,6 +15,8 @@ import {
   resolveWorkspace,
   workspaceManifest,
 } from "./workspace.ts";
+
+const log = logOf("dshdev");
 
 export interface BundleOptions {
   readonly workspace?: string;
@@ -70,7 +73,7 @@ async function macAppBundle(artifacts: string): Promise<string> {
     .map((entry) => join(dir, entry.name));
   const only = bundles[0];
   if (only === undefined || bundles.length !== 1) {
-    throw new Error(`desktop bundle: missing built application in ${dir}`);
+    throw new Error(`missing built application in ${dir}`);
   }
   return only;
 }
@@ -120,7 +123,7 @@ export async function installPlan(input: InstallPlanInput): Promise<InstallPlan>
       copySymlinksVerbatim: false,
     };
   }
-  throw new Error(`desktop bundle: unsupported platform ${platform}`);
+  throw new Error(`unsupported platform ${platform}`);
 }
 
 async function installApp(workspace: string, appConfig: AppConfig): Promise<void> {
@@ -133,7 +136,7 @@ async function installApp(workspace: string, appConfig: AppConfig): Promise<void
     ...(process.env.LOCALAPPDATA === undefined ? {} : { localAppData: process.env.LOCALAPPDATA }),
   });
   if (!(await pathExists(plan.source))) {
-    throw new Error(`desktop bundle: missing built application ${plan.source}`);
+    throw new Error(`missing built application ${plan.source}`);
   }
   await rm(plan.target, { recursive: true, force: true });
   await cp(plan.source, plan.target, {
@@ -144,9 +147,10 @@ async function installApp(workspace: string, appConfig: AppConfig): Promise<void
     await mkdir(dirname(plan.desktopEntry.path), { recursive: true });
     await writeFile(plan.desktopEntry.path, plan.desktopEntry.contents);
   }
-  console.log(
-    `desktop bundle: installed ${plan.target}${plan.desktopEntry === undefined ? "" : " with desktop entry"}`,
-  );
+  log.info("install %o", {
+    "target": plan.target,
+    "desktopEntry": plan.desktopEntry,
+  });
 }
 
 export async function runBundle(options: BundleOptions): Promise<void> {
@@ -164,9 +168,11 @@ export async function runBundle(options: BundleOptions): Promise<void> {
     profile: PROFILE_NAME,
   };
 
-  console.log(
-    `desktop bundle: workspace ${workspace} (${appConfig.displayName}@${appConfig.version})`,
-  );
+  log.info("bundle %o", {
+    "workspace": workspace,
+    "app.name": appConfig.displayName,
+    "app.version": appConfig.version,
+  });
   await runPrepareRuntime({ workspace });
   await runPrepareSeed({ workspace });
   // **放在准备步骤之后**：它们会重置工作目录里的内容，先装配的壳会被清掉。
@@ -180,10 +186,11 @@ export async function runBundle(options: BundleOptions): Promise<void> {
   await buildDesktopApp({
     appRoot: shell.root,
     buildCache: buildCacheDir,
+    appWorkspace: workspace,
     appConfig,
     icons,
     dir: options.dir,
   });
-  console.log(`desktop bundle: artifacts in ${join(buildCacheDir, "artifacts")}`);
+  log.info("artifacts %o", { "dir": join(buildCacheDir, "artifacts") });
   if (options.install) await installApp(workspace, appConfig);
 }

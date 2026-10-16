@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { logOf } from "@local/devkit/log";
 import { createHash, type Hash } from "node:crypto";
 import type { Dirent } from "node:fs";
 import {
@@ -21,21 +21,14 @@ import {
 } from "@morlay/dsh-desktop-shell/profile-project";
 import { SEED_HASH_NAME, SEED_RUNTIME_DIR_NAME } from "@morlay/dsh-desktop-shell/seed";
 import {
-  DSH_PACKAGE,
   closurePackageDirs,
   copyPackageTree,
-  materializeOfficialClosure,
   missingOfficialPackages,
-  officialDeploySpecs,
-  resolveOfficialPackage,
-  type OfficialResolutionInput,
 } from "./official-deps.ts";
 import {
   PROFILE_NAME,
   desktopProfileBundles,
   buildCache,
-  cleanDeployedSpec,
-  dshVersion as readDshVersion,
   findWorkspaceRoot,
   mergedDeploySettings,
   mergedProfileBundles,
@@ -46,7 +39,6 @@ import {
   type WorkspaceManifest,
 } from "./workspace.ts";
 
-const APP_ROOT = resolve(import.meta.dirname, "..", "..");
 async function pathExists(path: string): Promise<boolean> {
   try {
     await access(path);
@@ -66,47 +58,14 @@ async function inheritDeploySettings(root: string, destination: string): Promise
   if (merged !== target) await writeFile(targetPath, merged);
 }
 
-async function installOfficialSurface(
-  destination: string,
-  input: OfficialResolutionInput,
-): Promise<void> {
-  const pin = (await resolveOfficialPackage(DSH_PACKAGE, input))?.version ?? input.dshVersion;
-  const specs = await officialDeploySpecs(
-    input,
-    pin === undefined || pin.startsWith("workspace:") ? undefined : pin,
-  );
-  const names = Object.keys(specs);
-  if (names.length === 0) return;
-  const manifestPath = join(destination, "package.json");
-  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
-    dependencies?: Record<string, string>;
-  };
-  const dependencies = new Map(
-    Object.entries(manifest.dependencies ?? {}).map(([name, spec]) => [
-      name,
-      cleanDeployedSpec(spec),
-    ]),
-  );
-  for (const [name, spec] of Object.entries(specs)) dependencies.set(name, spec);
-  await writeFile(
-    manifestPath,
-    `${JSON.stringify(
-      {
-        ...manifest,
-        dependencies: Object.fromEntries([...dependencies].sort(([a], [b]) => (a < b ? -1 : 1))),
-      },
-      undefined,
-      2,
-    )}\n`,
-  );
-  await runPnpm(["install", "--prod", "--ignore-scripts"], destination);
-  console.log(
-    `desktop seed: installed ${String(names.length)} official registry packages into the deploy project`,
-  );
-}
 
-// 注入面（壳包的 `official-packages.generated.ts`）由壳包自己的脚本生成，提示只能指向那里：
-// 本包没有那个生成器，也不为它留转发入口。
+/**
+ * 闭包里缺官方包时的报错：`missing` 是「缺的包 → 谁声明了它」（见 `missingOfficialPackages`）。
+ * @param missing - 缺失的官方包与它们的声明方。
+ * @returns 可读的错误。
+ */
+const log = logOf("dshdev");
+
 export function missingOfficialPackagesError(
   missing: ReadonlyMap<string, readonly string[]>,
 ): Error {
@@ -114,8 +73,8 @@ export function missingOfficialPackagesError(
     .map(([packageName, requiredBy]) => `${packageName} (required by ${requiredBy.join(", ")})`)
     .join("; ");
   return new Error(
-    `desktop seed: deployed closure is missing official packages: ${detail}; ` +
-      "regenerate the injected surface with `pnpm --filter @morlay/dsh-desktop-shell run gen:official-packages`",
+    `deployed closure is missing official packages: ${detail}; ` +
+      "check that the app's dsh.profile.bundles and dependencies agree",
   );
 }
 
@@ -156,17 +115,9 @@ async function dropClientModulesCache(surface: string): Promise<void> {
  */
 export async function prepareDeploySurface(workspace: string): Promise<string> {
   const manifest = await workspaceManifest(workspace);
-  const workspaceRoot = await findWorkspaceRoot(workspace);
-  const dshVersion = readDshVersion(manifest);
-  const input: OfficialResolutionInput = {
-    workspace,
-    workspaceRoot,
-    toolRoot: APP_ROOT,
-    ...(dshVersion === undefined ? {} : { dshVersion }),
-  };
   const destination = join(buildCache(workspace), "deploy");
-  console.log(`desktop prod-surface: pnpm deploy -> ${destination}`);
-  await deployClosure(workspace, manifest.name, destination, input);
+  log.info("deploy %o", { "dir": destination });
+  await deployClosure(workspace, manifest.name, destination);
   // profile 面那几个文件（行清单等）按 app 的样子带过去：deploy 的产物是"安装结果"，不含它们。
   for (const entry of seedEntries(workspace, manifest)) {
     const source = join(workspace, entry);
@@ -178,42 +129,34 @@ export async function prepareDeploySurface(workspace: string): Promise<string> {
 }
 
 
-/** `profile` 依赖面的归档名：壳首启解压它（两边同名，见壳的 `seed.ts`）。 */
-const PROFILE_MODULES_ARCHIVE_NAME = "profile-node-modules.tar";
 
-/** 跑 `tar`（macOS/Linux 自带）：闭包上千个文件，别在 JS 里逐个拷。 */
-async function runTar(args: readonly string[]): Promise<void> {
-  await new Promise<void>((done, fail) => {
-    const child = spawn("tar", args, { stdio: ["ignore", "ignore", "inherit"] });
-    child.on("error", fail);
-    child.on("close", (code) =>
-      code === 0 ? done() : fail(new Error(`tar ${args.join(" ")} exited with ${String(code)}`)),
-    );
-  });
-}
-
-async function deployClosure(
-  workspace: string,
-  name: string,
-  destination: string,
-  input: OfficialResolutionInput,
-): Promise<void> {
+export async function deployClosure(workspace: string, name: string, destination: string): Promise<void> {
   const root = await findWorkspaceRoot(workspace);
   await rm(destination, { recursive: true, force: true });
   await mkdir(destination, { recursive: true });
   const args = root !== resolve(workspace) ? ["--filter", name] : [];
-  await runPnpm([...args, "deploy", "--prod", "--ignore-scripts", destination], root);
+  // **`injectWorkspacePackages`**：workspace 依赖按**内容**装进 deploy，而不是留一条指回仓库的链接。
+  // 一次 deploy（十来秒）就得到自包含的闭包——不必事后逐个实体化（那是 49 次拷贝），也不必为了 registry
+  // 侧再装一遍（那是第二次 install，纯重复）。
+  await runPnpm(
+    [
+      ...args,
+      "--config.inject-workspace-packages=true",
+      "deploy",
+      "--prod",
+      "--ignore-scripts",
+      destination,
+    ],
+    root,
+  );
   const modulesDir = join(destination, "node_modules");
   if (!(await pathExists(modulesDir))) {
-    throw new Error(`desktop seed: pnpm deploy did not produce ${modulesDir}`);
+    throw new Error(`pnpm deploy did not produce ${modulesDir}`);
   }
 
   await inheritDeploySettings(root, destination);
-  await installOfficialSurface(destination, input);
-
+  // `.pnpm` 里的包挂到顶层：profile 解压出来要像一份普通 `node_modules`（上游 profile 也是扁平布局）。
   await linkClosureTopLevel(modulesDir);
-  const copied = await materializeOfficialClosure(modulesDir, input);
-  console.log(`desktop seed: copied ${String(copied.length)} official source packages`);
 
   const missing = await missingOfficialPackages(modulesDir);
   if (missing.size > 0) {
@@ -411,21 +354,14 @@ export async function runPrepareSeed(options: PrepareSeedOptions): Promise<void>
   const workspace = resolve(options.workspace ?? resolveWorkspace());
   const manifest = await workspaceManifest(workspace);
   const workspaceRoot = await findWorkspaceRoot(workspace);
-  const dshVersion = readDshVersion(manifest);
-  const input: OfficialResolutionInput = {
-    workspace,
-    workspaceRoot,
-    toolRoot: APP_ROOT,
-    ...(dshVersion === undefined ? {} : { dshVersion }),
-  };
   const buildCacheDir = buildCache(workspace);
   const seedOutputRoot = join(buildCacheDir, "seed");
   const deployRoot = join(buildCacheDir, "deploy");
   const entries = seedEntries(workspace, manifest);
-  console.log(`desktop seed: workspace ${workspace} (${manifest.name})`);
-  console.log(`desktop seed: whitelist ${entries.join(", ")}`);
+  log.info("seed %o", { "workspace": workspace, "app.name": manifest.name });
+  log.info("seed.entries %o", { "entries": entries });
 
-  await deployClosure(workspace, manifest.name, deployRoot, input);
+  await deployClosure(workspace, manifest.name, deployRoot);
 
   await rm(seedOutputRoot, { recursive: true, force: true });
   const runtimeDir = join(seedOutputRoot, SEED_RUNTIME_DIR_NAME);
@@ -437,17 +373,8 @@ export async function runPrepareSeed(options: PrepareSeedOptions): Promise<void>
   // 它在产物里不可变，也不再被种进用户的 DSH_HOME。
   await cp(join(deployRoot, "package.json"), join(runtimeDir, "package.json"));
 
-  // **profile 的依赖面**：把 deploy 的**完整闭包**打成一份 tar 随包带走，首启解压进 profile。
-  //
-  // 以前是壳按载荷清单逐包 `link:` 进 profile：`link` 不带传递依赖（959 个包丢了），指向的还是构建机的
-  // 绝对路径（`.pnpm/<pkg>@file++++Users+morlay+src+…`）。tar 解压出来是实体文件，闭包完整、换机器也不坏。
-  await runTar([
-    "czf",
-    join(seedOutputRoot, PROFILE_MODULES_ARCHIVE_NAME),
-    "-C",
-    deployRoot,
-    "node_modules",
-  ]);
+  // **profile 的依赖面不再随 seed 走**：闭包与清单一并打进 app（`Resources/app.asar/profile`，见
+  // `../.agents/designs/20261016-随包布局：app 进 asar、宿主依赖住 runtime.md`），首启因此不需要落任何依赖。
 
   // profile 只持有 app 自带的（非官方 bundle）插件；依赖面整体由上面那份 tar 承载（解压即实体闭包），
   // 不再逐包 `link:` 回 runtime，也不再产 `desktop-runtime-packages.json` 那份载荷清单。
@@ -471,10 +398,11 @@ export async function runPrepareSeed(options: PrepareSeedOptions): Promise<void>
     seedRoot: seedOutputRoot,
   });
   await writeFile(join(profileDir, SEED_HASH_NAME), fingerprint);
-  console.log(
-    `desktop seed: wrote ${seedOutputRoot} (${fingerprint.slice(0, 12)}), ` +
-      `profile bundles ${localBundles.join(", ") || "(none)"}`,
-  );
+  log.info("seed %o", {
+    "dir": seedOutputRoot,
+    "fingerprint": fingerprint.slice(0, 12),
+    "bundles": localBundles,
+  });
 }
 
 // Bundles the profile itself owns; shipped bundles come from the runtime installation instead.
@@ -608,7 +536,7 @@ export async function profileRuntimeLinks(
   }
   if (missing.length > 0) {
     throw new Error(
-      `desktop seed: the deployed closure is missing dependencies of the profile's own bundles: ` +
+      `the deployed closure is missing dependencies of the profile's own bundles: ` +
         `${missing.join(", ")}`,
     );
   }

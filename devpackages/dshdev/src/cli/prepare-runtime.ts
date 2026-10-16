@@ -1,3 +1,4 @@
+import { logOf } from "@local/devkit/log";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { access, chmod, cp, mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
@@ -15,9 +16,9 @@ const PNPM_NATIVE_HELPERS = "pnpm/native-binary.mjs";
 // What the runtime entry loads: its wrapper and the node-gyp payload; pnpm's install script
 // relinks the platform binary, so the package must not be copied wholesale.
 const PNPM_PAYLOAD = ["bin", "dist", "native-binary.mjs", "package.json", "THIRD-PARTY-NOTICES.md"];
-// 随包的 TS 运行时入口（`@local/oxc-node`：注册 hooks + `oxc-transform`）——它接管 **node_modules 下**的
+// 随包的 TS 运行时入口（`@morlay/dsh-oxc-node`：注册 hooks + `oxc-transform`）——它接管 **node_modules 下**的
 // `.ts`，而这条链的壳与宿主正好住在那里（源码经 `exports` 指到 `src`）。
-const LOADER_ENTRY = fileURLToPath(import.meta.resolve("@local/oxc-node"));
+const LOADER_ENTRY = fileURLToPath(import.meta.resolve("@morlay/dsh-oxc-node"));
 // loader 要用到的两层依赖：`oxc-transform` 的转译器（含它按平台挑的原生绑定），以及装饰器转出来的
 // helper 所在的 `@oxc-project/runtime`。
 const LOADER_DEPENDENCY_MANIFESTS = [
@@ -149,6 +150,8 @@ async function prepareNode(
   }
   await rm(extraction, { recursive: true, force: true });
 }
+
+const log = logOf("dshdev");
 
 export interface PrepareRuntimeOptions {
   readonly workspace?: string;
@@ -324,8 +327,10 @@ export async function runPrepareRuntime(options: PrepareRuntimeOptions): Promise
       2,
     )}\n`,
   );
-  console.log(
-    `desktop runtime: prepared Node.js ${NODE_VERSION}, pnpm ${pnpmVersion} and the oxc loader ` +
-      `(oxc-transform ${loaderVersion}) for ${platform}-${arch}`,
-  );
+  log.info("runtime %o", {
+    "node": NODE_VERSION,
+    "pnpm": pnpmVersion,
+    "oxc": loaderVersion,
+    "platform": `${platform}-${arch}`,
+  });
 }

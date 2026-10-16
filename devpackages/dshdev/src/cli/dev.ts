@@ -1,3 +1,4 @@
+import { logOf } from "@local/devkit/log";
 import { spawn } from "node:child_process";
 import { access, mkdir } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -22,7 +23,7 @@ function debugPort(name: string, fallback: number): number {
   if (value === undefined || value === "") return fallback;
   const port = Number(value);
   if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
-    throw new Error(`desktop development: ${name} must be an integer from 1 through 65535`);
+    throw new Error(`${name} must be an integer from 1 through 65535`);
   }
   return port;
 }
@@ -37,12 +38,12 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 // dev 形态给子进程注入的 TS 注册：与工作区其它地方同一份（`pnpm-workspace.yaml` 的 `nodeOptions`），
-// 即 `@local/oxc-node`。上游包经 exports 指到 src 后，Node 原生 strip-only 不支持
+// 即 `@morlay/dsh-oxc-node`。上游包经 exports 指到 src 后，Node 原生 strip-only 不支持
 // parameter properties / enum / 装饰器，这一层转译必须挂上。
 function tsLoaderSpecifier(): string {
-  // `@local/oxc-node`（本仓库的 TS 运行时入口）：注册 hooks + `oxc-transform`，**接管 `node_modules` 下的
+  // `@morlay/dsh-oxc-node`（本仓库的 TS 运行时入口）：注册 hooks + `oxc-transform`，**接管 `node_modules` 下的
   // `.ts`**——整包源码直跑（壳与宿主都在那里），所以这条链要的是它。
-  return import.meta.resolve("@local/oxc-node");
+  return import.meta.resolve("@morlay/dsh-oxc-node");
 }
 
 function withTsLoader(environment: NodeJS.ProcessEnv, loader: string): NodeJS.ProcessEnv {
@@ -65,7 +66,7 @@ async function run(
       if (code === 0) resolvePromise();
       else
         reject(
-          new Error(`desktop development: ${args.join(" ")} exited with ${String(code ?? signal)}`),
+          new Error(`${args.join(" ")} exited with ${String(code ?? signal)}`),
         );
     });
   });
@@ -78,7 +79,7 @@ async function webEntry(): Promise<string> {
   );
   const entry = join(hostRoot, "src", "web.ts");
   if (!(await pathExists(entry))) {
-    throw new Error(`desktop development: missing ${entry}; run the tool build (pnpm build)`);
+    throw new Error(`missing ${entry}; run the tool build (pnpm build)`);
   }
   return entry;
 }
@@ -131,10 +132,10 @@ async function launchElectron(
     DSH_DESKTOP_OPEN_DEVTOOLS: process.env.DSH_DESKTOP_OPEN_DEVTOOLS ?? "1",
     ELECTRON_ENABLE_LOGGING: process.env.ELECTRON_ENABLE_LOGGING ?? "1",
   };
-  console.log(`desktop development: DSH_HOME=${dataDir}`);
-  console.log(`desktop development: profile root=${profileDir} runtime=${runtimeDir}`);
-  console.log(
-    `desktop development: inspectors main=${String(mainPort)}, renderer=${String(rendererPort)}, host=${String(hostPort)}`,
+  log.info(`DSH_HOME=${dataDir}`);
+  log.info(`profile root=${profileDir} runtime=${runtimeDir}`);
+  log.info(
+    `inspectors main=${String(mainPort)}, renderer=${String(rendererPort)}, host=${String(hostPort)}`,
   );
   await run(
     electron,
@@ -153,6 +154,8 @@ async function launchElectron(
   );
 }
 
+const log = logOf("dshdev");
+
 export interface DevOptions {
   readonly workspace?: string;
   readonly web: boolean;
@@ -162,6 +165,12 @@ export interface DevOptions {
    * 面与真打包完全一致，而不必先等一次 electron-builder。
    */
   readonly prod?: boolean;
+  /**
+   * 直接指定 profile root（覆盖上面两种选择）：拿打包形态生成的那份目录（`$DSH_HOME/profiles/<name>`）
+   * 或别的 profile 做对照诊断时用。指定它就当**打包形态的解析面**跑（不标 `DSH_DEV_FORM`）——那种目录的
+   * 依赖在它自己的 `node_modules` 里，与 dev 的逐文件策略不是一套。
+   */
+  readonly profileDir?: string;
   // 数据目录（`$DSH_HOME`）：缺省是 profileDir 下的 `.dsh-store`，取值语义见 `resolveDataDir`。
   readonly dataDir?: string;
 }
@@ -189,9 +198,18 @@ export async function runDev(options: DevOptions): Promise<void> {
   // 两种 dev 形态共用同一个数据目录；`--data-dir=xdg` 时与打包形态落到同一个位置。
   const dataDir = resolveDataDir(workspace, manifest.name, options.dataDir);
   const runtimeDir = devRuntimeRoot(repositoryRoot);
+  // `--profile-dir`：直接给 profile root（拿打包形态生成的那份做对照时用）。给了就不必再跑 deploy——
+  // 那份目录已经把闭包带在自己身上了。
+  const profileOverride =
+    options.profileDir === undefined ? undefined : resolve(options.profileDir);
   // `--prod`：先装配"打包形态的解析面"（deploy 闭包 + profile 清单），再照常起——闭包内容、profile
   // 清单、依赖解析面与真打包一致，于是**不打包**也能验证打包形态。seed 的布局就是打包形态的布局。
-  const prod = options.prod === true ? await prepareProdSurface(workspace) : undefined;
+  const prod =
+    options.prod === true && profileOverride === undefined
+      ? await prepareProdSurface(workspace)
+      : undefined;
+  // 跑的是不是"打包形态的解析面"：`--prod`，或指定了 profile 目录（那份目录按打包形态产出）。
+  const prodSurface = prod !== undefined || profileOverride !== undefined;
   const activeRuntimeDir = prod?.runtimeDir ?? runtimeDir;
   if (prod === undefined) await requireDevRuntime(runtimeDir);
   const tsLoader = tsLoaderSpecifier();
@@ -204,11 +222,12 @@ export async function runDev(options: DevOptions): Promise<void> {
     // 装配**完全**来自 profile 的 `dsh.profile.bundles`：各 bundle 自己的 patch 由 loader 按
     // `dsh.bundle.patch` 读，这里一个 overlay 都不额外挂——否则 dev 与打包两条路挂的层不同，
     // 出了问题没法定位（"哪个 patch 生效"必须两边同源）。
-    const profileRoot = prod?.profileDir ?? workspace;
-    console.log(
-      `desktop development: web mode${prod === undefined ? "" : " (prod surface)"} ` +
-        `DSH_HOME=${dataDir} profile root=${profileRoot}`,
-    );
+    const profileRoot = profileOverride ?? prod?.profileDir ?? workspace;
+    // 值与结构当参数传（`%o`），不拼 `key=value`：键名 `.` 分层、不带空格。
+    log.info("web mode%s %o", prodSurface ? " (prod surface)" : "", {
+      "DSH_HOME": dataDir,
+      "profile.root": profileRoot,
+    });
     await run(
       process.execPath,
       [await webEntry(), "--profile-dir", profileRoot, "--runtime-dir", activeRuntimeDir],
@@ -224,7 +243,7 @@ export async function runDev(options: DevOptions): Promise<void> {
           // 形态标志：dev 形态要标（这条链的"根在哪"与预编译策略都看它）。`--prod` **不标**——它要跑的
           // 就是打包形态那一套（联邦预编译、`dev.exclude` 之外的包按包产出），标了会退回 dev 的逐文件策略，
           // 于是"验证打包形态"就落空了。
-          ...(prod === undefined ? { DSH_DEV_FORM: "web" } : {}),
+          ...(prodSurface ? {} : { DSH_DEV_FORM: "web" }),
         },
         tsLoader,
       ),
@@ -248,5 +267,12 @@ export async function runDev(options: DevOptions): Promise<void> {
     profile: PROFILE_NAME,
   });
 
-  await launchElectron(shell.root, prod?.profileDir ?? workspace, activeRuntimeDir, buildCacheDir, tsLoader, dataDir);
+  await launchElectron(
+    shell.root,
+    profileOverride ?? prod?.profileDir ?? workspace,
+    activeRuntimeDir,
+    buildCacheDir,
+    tsLoader,
+    dataDir,
+  );
 }

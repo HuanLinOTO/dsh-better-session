@@ -48,6 +48,7 @@ describe("prepareShellAppDirectory", () => {
 
     const prepared = await prepareShellAppDirectory({
       appRoot: appDir,
+      appWorkspace: "/app",
       buildCache: await workDir(),
       appConfig: appConfig(),
       icons: {},

@@ -22,6 +22,7 @@ function resolveWorkspaceArg(workspace: string | undefined): string {
 }
 
 interface DevFlags {
+  readonly profileDir?: string;
   readonly dataDir?: string;
   readonly prod?: boolean;
 }
@@ -58,12 +59,17 @@ program
     "--prod",
     "assemble the packaged surface first (pnpm deploy closure + profile manifests) and boot against it",
   )
+  .option(
+    "--profile-dir <dir>",
+    "boot this profile root instead of the workspace / the --prod deploy surface (for comparing against a packaged profile)",
+  )
   .argument("[workspace]", "app workspace directory (default: current directory)")
   .action(async (workspace: string | undefined, options: DevFlags) => {
     await runDev({
       workspace: resolveWorkspaceArg(workspace),
       web: true,
       ...(options.prod === true ? { prod: true } : {}),
+      ...(options.profileDir === undefined ? {} : { profileDir: options.profileDir }),
       ...(options.dataDir === undefined ? {} : { dataDir: options.dataDir }),
     });
   });
@@ -76,12 +82,17 @@ const desktop = program
     "--prod",
     "assemble the packaged surface first (pnpm deploy closure + profile manifests) and boot against it",
   )
+  .option(
+    "--profile-dir <dir>",
+    "boot this profile root instead of the workspace / the --prod deploy surface (for comparing against a packaged profile)",
+  )
   .argument("[workspace]", "app workspace directory (default: current directory)")
   .action(async (workspace: string | undefined, options: DevFlags) => {
     await runDev({
       workspace: resolveWorkspaceArg(workspace),
       web: false,
       ...(options.prod === true ? { prod: true } : {}),
+      ...(options.profileDir === undefined ? {} : { profileDir: options.profileDir }),
       ...(options.dataDir === undefined ? {} : { dataDir: options.dataDir }),
     });
   });
