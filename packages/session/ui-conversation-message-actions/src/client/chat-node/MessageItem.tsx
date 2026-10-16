@@ -17,12 +17,9 @@ import {
 } from "@morlay/dsh-client-ui-primitives";
 import { memo, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import type { InjectFace, PropsRenderSlots } from "@deepseek-ai/dsh-client-ui-slots";
+import type { InjectFace } from "@deepseek-ai/dsh-client-ui-slots";
 import type { UserMessageNode } from "@deepseek-ai/dsh-client-ui-chat/client";
 import type { ChatNodeViewProps, ChatViewSlotProps } from "@deepseek-ai/dsh-client-ui-chat/client";
-// 图片走上游的单一槽 `conversation.chat.user.images`（user / steering 与输出图片各自独立可替换），
-// 槽的 owner props 就是 `{ images, loadImage, align }`。
-import type { MessageImageLoader } from "@deepseek-ai/dsh-client-ui-conversation/client";
 // 动作行整条用上游那份：复制 / 分支 / 时间标签的悬停显形都归它，我们只经它的 `extraActions` 注入自己的两个入口。
 // 按**包名**引（上游 `exports` 里有 `./src/*`）：走相对路径等于把 vendor 的目录布局抄进代码，闭包面
 // （`node_modules/.pnpm/…`，部署形态）里深度对不上就解析不到——开发态恰好因为目录层级吻合而看不出来。
@@ -54,21 +51,17 @@ function contentParts(content: readonly unknown[]): {
 
 function UserStyleBubble({
   content,
-  renderSlot,
-  loadImage,
   actions,
   references,
   t,
 }: {
   content: readonly unknown[];
-  renderSlot: PropsRenderSlots<"conversation.chat.user.images">["renderSlot"];
-  loadImage: MessageImageLoader;
   actions?: (text: string) => ReactNode;
   // 引用 chip 的点击目标（owner props；缺省时 chip 照常渲染但点击无效果）。
   references?: ReferenceActions | undefined;
   t: ChatViewSlotProps["t"];
 }): ReactNode {
-  const { text, images, rest } = contentParts(content);
+  const { text, rest } = contentParts(content);
   const truncated = (total: number): string => t("json.truncated", { total });
   // labels 按 locale revision 稳定（官方 MarkdownText 在它上面 memo 渲染缓存）。
   const labels = useMemo(() => markdownLabels(t), [t]);
@@ -76,7 +69,10 @@ function UserStyleBubble({
   return (
     <Stack align="end" gap={6} data-time-hover-root>
       <Stack align="end" gap={8} narrow>
-        {renderSlot("conversation.chat.user.images", { images, loadImage, align: "end" })}
+        {/* TODO(上游 0.2.1-alpha.4)：用户消息的图片不能再从这个 shadow 渲染器里渲染——
+            `conversation.chat.user.images` 的声明权归上游 factory `conversation.chat.user.content`
+            （重复声明即抛错，注册会失败、整个渲染器回落到官方那份），而 factory 是整块内容，
+            只能连文本一起交回。接法待定，见设计 20260917-对话UI重构 的槽占用面。 */}
         {showBubble && (
           <Bubble>
             <ReferenceMarkdown text={text} labels={labels} actions={references} />
@@ -98,14 +94,12 @@ function UserStyleBubble({
 
 export const UserMessageNodeView = memo(function UserMessageNodeView({
   node,
-  renderSlot,
-  loadImage,
   t,
   openFile,
   openSkill,
   recall,
   retry,
-}: ChatNodeViewProps<"user" | "steering"> & PropsRenderSlots<"conversation.chat.user.images"> & {
+}: ChatNodeViewProps<"user" | "steering"> & {
   // keyed 渲染器由 owner props 展开调用：引用 chip 的点击目标从这里来。
   openFile: (path: string) => void;
   openSkill: (name: string) => void;
@@ -204,8 +198,6 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
       )}
       <UserStyleBubble
         content={data.content}
-        renderSlot={renderSlot}
-        loadImage={loadImage}
         references={{ openFile, openSkill }}
         t={t}
         actions={(text) => (

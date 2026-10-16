@@ -21,9 +21,6 @@ export function registerChatNodeRenderers(
           name: "conversation.chat.node",
           key,
           locale: NS,
-
-          // 图片渲染授权：本渲染器自己渲染用户消息的图片槽（输出图片那个槽不归这里）。
-          children: { "conversation.chat.user.images": { kind: "single", scope: "session" } },
           priority: -1,
           inject: injectFace,
         } as never,
