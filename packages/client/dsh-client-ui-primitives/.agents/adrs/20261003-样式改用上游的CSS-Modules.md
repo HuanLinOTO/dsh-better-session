@@ -1,10 +1,9 @@
 # 本包样式改用上游那套 CSS Modules
 
-状态：已采纳（取代 [ADR-css-in-js样式层与官方token消费](./20260917-css-in-js样式层与官方token消费.md)；
-[ADR-设置表单原语搬进client半](./20260923-设置表单原语搬进client半.md) 的"样式改 css-in-js"那半同时作废，控件仍归本包）
+状态：已采纳
 
-背景：本包当初自建 css-in-js（`styled` / `Token` / `dsw` / 生成 token 树），理由是"源码直接加载、零预编译"。
-这条理由的三块前提后来都不成立了：
+背景：本包的样式由上游那套 CSS Modules 承担——不自建样式层（`styled` / `Token` / `dsw` / 生成 token 树那套不在）。
+理由是三条：
 
 - **上游本来就是 CSS Modules**：官方 `@deepseek-ai/dsh-client-ui-primitives` 每个组件一个 `.module.css`，
   token 直接写 `var(--dsw-*)`。两套样式机制在同一页面上并存——业务借用官方类名（例如统计行"照抄上游

@@ -64,27 +64,17 @@ function readPluginMeta(name: string, manifestUrl: string): PluginMeta | undefin
   exemptions —— 我们无对应需求；遇到即报错，不静默跳过；
 - 不做 `--dump-config` 那一族诊断出口。
 
-## 迁移清单
-
-| 位置 | 现在 | 换成 |
-| --- | --- | --- |
-| dsh-desktop-host 原先那份 `app-boot.ts`（**已删除**，逻辑搬进本包） | `dsh-app-boot` + `dsh/profile-boot` | **已换**：[`src/app-profile.ts`](../../src/app-profile.ts) 与 [`src/profile-boot.ts`](../../src/profile-boot.ts) |
-| [`packages/desktop/dsh-desktop-host/src/web.ts`](../../../../desktop/dsh-desktop-host/src/web.ts) | 同上 | 同上 |
-| [`devpackages/dshdev/src/cli/check-locale.ts`](../../../../../devpackages/dshdev/src/cli/check-locale.ts) | `readPluginMeta` | 自研 `readPluginMeta` |
-| [`devpackages/devkit/src/__tests__/plugin-icon.spec.ts`](../../../../../devpackages/devkit/src/__tests__/plugin-icon.spec.ts) | `readPluginMeta` | 同上 |
-| `packages/desktop/dsh-desktop-shell/package.json` | 声明 `@deepseek-ai/dsh`（代码里无 import） | 删除该声明 |
-
 ## 验收
 
 1. **单测**：profile 组装（fixture bundle：`patch` 为字符串 / 数组、缺 `dsh.bundle` 必报错、层序正确）；
    `runProfile` 起一棵最小 cordis 树（fixture：一个 insert 行 + 一个 patch 覆盖它，断言 config 真的生效）
-   —— 这条测试必须在"patch 按 id 覆盖失效"时失败，它就是当前 bug 的回归网。
+   —— 这条测试必须在"patch 按 id 覆盖失效"时失败，它就是那条覆盖语义的回归网。
 2. **本地**：`dshdev web --prod` 起得来且页面 200；`dshdev desktop --prod` 同。
 
-## 落地记录（第一刀怎么切的）
+## 与上游的分工
 
-原先担心的未知是 `PluginPackages`（依赖包 → entries 的推导）与 `mountRootInclude`：不复刻它们，bundle 的
-`dependencies` 就不会成为行，官方 bundles 直接失效。实际落地的切法是——**这两层继续用上游**：
+`PluginPackages`（依赖包 → entries 的推导）与 `mountRootInclude` 这两层继续用上游——不复刻它们，bundle 的
+`dependencies` 就不会成为行、官方 bundles 直接失效：
 
 - 借上游 `@deepseek-ai/dsh-app-boot` 的 `boot` / `loadProfileDirectory` / `readProfilePatches` /
   `createRuntimeResolution` / `loadOverlayPatches` / `installFailLoud` / `PluginPackages`（公开包，可依赖）；
@@ -93,6 +83,3 @@ function readPluginMeta(name: string, manifestUrl: string): PluginMeta | undefin
   [`有界退出控制器`](../../src/process-shutdown.ts)；
 - 于是对 `@deepseek-ai/dsh`（vendor 里那个 private 的 `apps/cli`）的依赖归零，而"哪一层生效"的规则仍在上游
   那一层——若将来要改 patch 与 insert 的 id 匹配语义，那才是需要动 `boot` 那一步的时候。
-
-已核验：dev 形态经本包起树、页面 HTTP 200（`PORT=3082 dshdev web apps/dsh-custom-next`）；全仓测试与
-`just lint` 干净。
