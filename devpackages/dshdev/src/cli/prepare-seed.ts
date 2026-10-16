@@ -417,20 +417,40 @@ export function profileLocalBundles(manifest: WorkspaceManifest): string[] {
 
 // Generate the profile manifest: app identity plus the assembly rows it declares.
 //
-// **不含 `dependencies`**：清单只声明"要哪些装配行"（`dsh.profile.bundles`），而来源是**当前这份运行时**
-// 的绝对位置——只有运行时知道（应用会被挪目录），所以由壳在装 profile 时写进去。种子里写死任何 spec
-// 都会在离线安装时去 registry 解析，或指向不成立的相对路径。
+// **`dependencies` 只列"非 `@deepseek-ai` 前缀"的直接依赖**（本地工作区包），版本写**具体值**（app 的
+// `version`，它们与 app 同源发布）——`workspace:*` 在 profile 里解析不了，而 profile 是安装产物。
+//
+// 上游包（`@deepseek-ai/*`）**不进这份清单**：它们由 runtime 的解析锚点提供，抄进 profile 只是把同一份
+// 源码再复制一遍。这份清单是**插件管理页判定 `installed` 的依据**（`plugin-manager` 读 `dependencies`），
+// 缺了它，随包带来的行会呈现成"未安装"。
 //
 // profile 是安装产物：清单按官方形态写（官方 bundles 在前 + app 自己声明的），只保留装配字段，
 // app 的 `dsh.version` / `desktop` / `dev` 属于打包输入，运行时不再从 profile 读它们。
 export function profileManifest(manifest: WorkspaceManifest): Record<string, unknown> {
+  const dependencies = profileDependencies(manifest);
   return {
     name: manifest.name,
     private: true,
     version: manifest.version ?? "0.0.0",
     type: "module",
+    ...(Object.keys(dependencies).length === 0 ? {} : { dependencies }),
     dsh: { profile: { ...manifest.dsh?.profile, bundles: mergedProfileBundles(manifest) } },
   };
+}
+
+/**
+ * profile 清单里的直接依赖：非 `@deepseek-ai` 前缀的那些，版本落到具体值。
+ * @param manifest - app 的工作区清单。
+ * @returns 依赖名到具体版本的映射（可能为空对象）。
+ */
+export function profileDependencies(manifest: WorkspaceManifest): Record<string, string> {
+  const version = manifest.version ?? "0.0.0";
+  const dependencies: Record<string, string> = {};
+  for (const [name, specifier] of Object.entries(manifest.dependencies ?? {})) {
+    if (name.startsWith("@deepseek-ai/")) continue;
+    dependencies[name] = specifier.startsWith("workspace:") ? version : specifier;
+  }
+  return dependencies;
 }
 
 /**

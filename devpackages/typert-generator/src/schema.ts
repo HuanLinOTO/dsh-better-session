@@ -235,6 +235,11 @@ export function zodOf(node: Node | undefined, context: EmitContext): string {
       // `T['field']`：顺着引用找到 T 的声明，取那个字段的类型（上游也是就地展开）。
       const object = node["objectType"] as Node;
       const key = node["indexType"] as Node;
+      // 映射类型的索引访问（`{ [K in U]: V }[U]`）：U 是 declare-merge 的开放集合时（如
+      // `TypertResourceKind` = `Extract<keyof TypertResourceMap, string>`），成员只在**完整程序**里合并出来，
+      // 而声明树按文件摊开、看不到合并结果。上游由类型检查器求值，这条 AST 路线求不了，兜底 `unknown`
+      // （宽松，不拒合法值）。
+      if (object["type"] === "TSMappedType") return "z.unknown() /* TODO 映射类型索引访问 */";
       const name = object["type"] === "TSTypeReference" ? nameOf(object["typeName"] as Node) : undefined;
       const declared = name === undefined ? undefined : context.index.get(name);
       const members = (declared?.node["body"]?.["body"] ?? []) as Node[];
@@ -260,7 +265,11 @@ export function zodOf(node: Node | undefined, context: EmitContext): string {
             : undefined);
       const target = members.find((member) => nameOf(member["key"] as Node) === field);
       if (target === undefined) {
-        throw new Error(`索引访问解析失败：${String(name)}[${String(field)}]`);
+        throw new Error(
+          `索引访问解析失败：${String(name)}[${String(field)}] `
+            + `@ ${String(context.file)}#${String(node["start"])} `
+            + `objectType=${String(object["type"])} indexType=${String(key["type"])}`,
+        );
       }
       let value = zodOf(target["typeAnnotation"]?.["typeAnnotation"] as Node, context);
       if (target["optional"] === true) value += ".optional()";
