@@ -28,22 +28,16 @@ disable-model-invocation: true
 ```
 
 同步链是 [`scripts/upstream-sync`](../../../scripts/upstream-sync/package.json) 这个包（**不在 workspace 里**），
-依赖由 just 现装（`_deps`：AST 探查要用的 oxc 解析器等）。日常用 just 的三个入口，内部走
-`pnx --package=<该包> upstream-sync <子命令>`：
+依赖由 just 现装（`_deps`：AST 探查要用的 oxc 解析器等）。五个入口都在
+[`vendor/justfile`](../../../vendor/justfile)，内部走 `pnx --package=<同步链包的绝对路径> upstream-sync <子命令>`
+（**`pnx` 只认绝对路径或已安装的包名**：给相对路径会被当成 git 依赖，或拷进 dlx 缓存后找不到它的 bin）：
 
 ```sh
 just vendor sync          # 1. 对齐到目标提交
 just vendor patch         # 2. steps.ts 的 patch 阶段（从干净基线跑一次）
-just vendor prebuild      # 3. steps.ts 的 prebuild 阶段（生成物 + native）
-pnx --package=scripts/upstream-sync upstream-sync vendor        # 4. 按需 vendored 的上游内部文件（见下）
-pnx --package=scripts/upstream-sync upstream-sync vendor-check  # CI：只比对 vendored 快照与上游，不写
-```
-
-`vendor` / `vendor-check`（按需 vendored 的上游内部文件、以及 CI 的只比对）没有 just 入口，直接调包：
-
-```sh
-pnx --package=scripts/upstream-sync upstream-sync vendor
-pnx --package=scripts/upstream-sync upstream-sync vendor-check
+just vendor vendor        # 3. 按需 vendored 的上游内部文件（见下）
+just vendor prebuild      # 4. steps.ts 的 prebuild 阶段（生成物 + native）
+just vendor vendor-check  # CI：只比对 vendored 快照与上游，不写
 ```
 
 **为什么是包**：链上要用到解析器（AST 探查，如 `exports` 步骤里的依赖修复）。散脚本住在技能目录下、不属于任何
@@ -114,12 +108,11 @@ pnx --package=scripts/upstream-sync upstream-sync vendor-check
 6. **`vendor/steps.ts` 两阶段清单**：裁剪、补丁与生成步骤都写在这里（见「patch 阶段」），
    `vendor/patches/*.patch` 放补丁文件本身。清单是 TS，两个阶段各一个具名导出
    （`export const patch` / `export const prebuild`），每条步骤就地写「为什么」。它是同步配置、
-   不属于任何编译面（host 叶已把它排除），类型检查走同步链包自己的 `tsconfig.json`
-   （它自带的那份，若有）。
+   不属于任何编译面（host 叶已把它排除），所以不单独做类型检查——改错在跑链时报出来。
 
 ## 同步流程
 
-日常同步 = **sync → patch → prebuild**（同步链不需要根目录 `pnpm install`）。顺序固定，
+日常同步 = **sync → patch → vendor → prebuild**（同步链不需要根目录 `pnpm install`）。顺序固定，
 用 oxc 驱动直调脚本（勿用 `pnpm exec`，也勿引入 tsx）：
 
 ```sh
@@ -140,7 +133,7 @@ just vendor vendor-check  # CI：只比对 vendored 快照与上游，不写
 所以没有「构建上游」这一步（决策与放弃的产物见
 [ADR-开发与桌面消费上游源码面](../../adrs/20261010-开发与桌面消费上游源码面而非lib产物.md)）。
 两条路都不是可任意重跑的：`patch` 的 `text` / `git` 步骤要的是**未打过补丁的干净基线**，
-`prebuild` 的 typert 分析要的是上游 tsconfig（本阶段末尾会把它删掉），所以**重跑一律从 sync 开始**
+`prebuild` 的 typert 生成要的是声明树（`target/dts`）与 `patch` 改写后的源码面出口表，所以**重跑一律从 sync 开始**
 （整条链在本仓库实测十几秒）。
 
 ### sync.ts：同步上游到指定提交
@@ -184,8 +177,8 @@ export const patch: Step[] = [
 - **`rm` 的 `glob` 形态**：按模式批量删（`fs.glob` 展开，`node_modules` 永不在范围内）。
   本仓库用它删掉上游**全部** `tsconfig*.json`：上游不再构建，那些配置只剩干扰，删掉的理由是
   口径唯一——按文件就近找 tsconfig 的工具（tsgo / oxc）只会读到根上那一份，不会撞上未开
-  `experimentalDecorators` 的上游口径。它排在 `prebuild` **末尾**：typert 分析器正是靠上游根的
-  face tsconfig（`tsconfig.host.json` / `tsconfig.client.json`）找贡献者包，先删就没得读了。
+  `experimentalDecorators` 的上游口径。它排在 `patch` 阶段**末尾**：typert 生成走本仓库自己的
+  AST 生成器、不读上游 tsconfig，所以删在它前面也不影响这条链。
 - **`text`**：对文件做正则替换（不匹配 / 无变化即失败）。本仓库那一条给 typert analyzer 的
   「数据出口」跳过列表补 `css`：`.css` 与 `svg`/`png` 同类（无 TS API），`client/ui-theme` 的
   `brand-font.css` 出口否则会在分析期被判为「missing source」。它改的是上游工作树，放在
@@ -206,6 +199,11 @@ export const patch: Step[] = [
   （资产、`./src/*`）原样。找不到源码的出口打印清单后保持原样——它是上游新增出口的信号，不是同步失败。
   同构规则推不出来的那两类出口（生成物出口、出口名 ≠ 源文件名的包）由步骤自带参数给：`generated`
   与 `explicit` 两个映射就写在 `vendor/steps.ts` 的这一步里（一处说明，不在脚本里藏常量）。
+  同构规则本身认得的上游形态写在 `scripts/upstream-sync/src/exports.ts` 的 `srcCandidates` 里
+  （`lib/index.js`、`lib/types/<x>.d.ts|.js`、`lib/types/<dir>/index.d.ts`、`lib/client.js`，以及
+  `dualClient` 的 `lib/client.{node,browser}.js`——那是同一个上游 client 入口
+  （例如 `vendor/deepseek-harness/packages/api/gateway/src/client/index.ts`）出的两份产物）；
+  上游新增一类产物命名时，加在这个函数里而不是逐包写 `explicit`。
 
 > 改补丁 / 裁包之后，若 lockfile 仍固化被裁依赖，需重新生成 lockfile
 > （`pnpm install --lockfile-only`）——否则后续 install 仍会下载。
@@ -222,7 +220,7 @@ export const patch: Step[] = [
   缺失时还会**隐式 install**）会造出上游自己的顶层 `node_modules`，与根 workspace 的链接形成双副本
   ——实测让 client 测试成片失败，且根 install 不加 `--force` 认不出差别、复不了原。native 构建要的
   依赖由根 install 提供。
-- **`rm tsconfig`**：见上一节的 glob 说明（口径收口，必须排在 `typert` 之后）。
+- **`rm tsconfig`**：不在这一段——它排在 `patch` 阶段末尾（见上一节的 glob 说明）。
 
 > 仓库可封装为命令（`vendor sync` / `vendor patch` / `vendor prebuild`；根 `just prepare`
 > 串成 sync → patch → dep → prebuild），语义与流程一致。
@@ -238,8 +236,8 @@ export const patch: Step[] = [
 5. **重跑生成物与 lockfile**（上游包与主题一变就漂移，门禁只在重跑后才可信）：
    - 根 lockfile：`pnpm install --lockfile-only`（上游新包、上游钉住的依赖版本
      如 koffi 都靠它对齐）；
-   - 官方包清单：`pnpm --filter @morlay/dsh-desktop-shell run gen:official-packages`
-     （读上游 bundle 的 `cordis.patch.yml`）。
+   - 官方包清单：壳包已没有那个生成器；deploy 闭包缺官方包由 `dshdev` 的 seed 报错
+     （`missingOfficialPackagesError`）与它的用例守护，对着 app 的 `dsh.profile.bundles` 与依赖核。
 6. 门禁：test / lint / build，与 CI 一致。
 7. **适配评估（必做）**：对照「cordis 扩展面清单」逐面核对变化；结论记录
    为决策文档或变更日志；行为变更连同测试一起改。

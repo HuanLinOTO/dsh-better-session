@@ -47,7 +47,8 @@ function renderNode(
   // keyed 渲染器的 props 由 slot 面注入：这里只给门控逻辑关心的那几个。
   const View = UserMessageNodeView as unknown as (props: {
     node: unknown;
-    renderMessageImages: unknown;
+    renderSlot: unknown;
+    loadImage: unknown;
     t: unknown;
     openFile: (path: string) => void;
     openSkill: (name: string) => void;
@@ -57,7 +58,8 @@ function renderNode(
   render(
     <View
       node={node}
-      renderMessageImages={() => null}
+      renderSlot={() => null}
+      loadImage={() => undefined}
       t={t}
       openFile={() => {}}
       openSkill={() => {}}

@@ -111,13 +111,13 @@ function bench() {
     },
   });
   ctx.provide("locale", { bind: () => t });
-  const mirror = new SettingsDescribeMirror(ctx, "host");
+  const mirror = new SettingsDescribeMirror(ctx);
   let notified = 0;
   mirror.subscribe(() => {
     notified += 1;
   });
   // `SettingsSchemaService` 与 `ConfigForms` 都在自己的构造里把服务挂上（超类 Service 注册），不必再 provide。
-  const forms = new ConfigForms(ctx, { mirror, schema, persistence: "host" });
+  const forms = new ConfigForms(ctx, { mirror, schema });
   return {
     ctx,
     notified: () => notified,

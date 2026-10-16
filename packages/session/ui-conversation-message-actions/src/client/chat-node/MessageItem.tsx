@@ -17,10 +17,12 @@ import {
 } from "@morlay/dsh-client-ui-primitives";
 import { memo, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import type { InjectFace } from "@deepseek-ai/dsh-client-ui-slots";
+import type { InjectFace, PropsRenderSlots } from "@deepseek-ai/dsh-client-ui-slots";
 import type { UserMessageNode } from "@deepseek-ai/dsh-client-ui-chat/client";
 import type { ChatNodeViewProps, ChatViewSlotProps } from "@deepseek-ai/dsh-client-ui-chat/client";
-import type { RenderMessageImages } from "@deepseek-ai/dsh-client-ui-conversation/client";
+// 图片走上游的单一槽 `conversation.chat.user.images`（user / steering 与输出图片各自独立可替换），
+// 槽的 owner props 就是 `{ images, loadImage, align }`。
+import type { MessageImageLoader } from "@deepseek-ai/dsh-client-ui-conversation/client";
 // 动作行整条用上游那份：复制 / 分支 / 时间标签的悬停显形都归它，我们只经它的 `extraActions` 注入自己的两个入口。
 // 按**包名**引（上游 `exports` 里有 `./src/*`）：走相对路径等于把 vendor 的目录布局抄进代码，闭包面
 // （`node_modules/.pnpm/…`，部署形态）里深度对不上就解析不到——开发态恰好因为目录层级吻合而看不出来。
@@ -52,14 +54,15 @@ function contentParts(content: readonly unknown[]): {
 
 function UserStyleBubble({
   content,
-  renderMessageImages,
+  renderSlot,
+  loadImage,
   actions,
   references,
   t,
 }: {
   content: readonly unknown[];
-  renderMessageImages: RenderMessageImages;
-
+  renderSlot: PropsRenderSlots<"conversation.chat.user.images">["renderSlot"];
+  loadImage: MessageImageLoader;
   actions?: (text: string) => ReactNode;
   // 引用 chip 的点击目标（owner props；缺省时 chip 照常渲染但点击无效果）。
   references?: ReferenceActions | undefined;
@@ -73,7 +76,7 @@ function UserStyleBubble({
   return (
     <Stack align="end" gap={6} data-time-hover-root>
       <Stack align="end" gap={8} narrow>
-        {renderMessageImages({ images, align: "end" })}
+        {renderSlot("conversation.chat.user.images", { images, loadImage, align: "end" })}
         {showBubble && (
           <Bubble>
             <ReferenceMarkdown text={text} labels={labels} actions={references} />
@@ -95,13 +98,14 @@ function UserStyleBubble({
 
 export const UserMessageNodeView = memo(function UserMessageNodeView({
   node,
-  renderMessageImages,
+  renderSlot,
+  loadImage,
   t,
   openFile,
   openSkill,
   recall,
   retry,
-}: ChatNodeViewProps<"user" | "steering"> & {
+}: ChatNodeViewProps<"user" | "steering"> & PropsRenderSlots<"conversation.chat.user.images"> & {
   // keyed 渲染器由 owner props 展开调用：引用 chip 的点击目标从这里来。
   openFile: (path: string) => void;
   openSkill: (name: string) => void;
@@ -200,7 +204,8 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
       )}
       <UserStyleBubble
         content={data.content}
-        renderMessageImages={renderMessageImages}
+        renderSlot={renderSlot}
+        loadImage={loadImage}
         references={{ openFile, openSkill }}
         t={t}
         actions={(text) => (

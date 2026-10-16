@@ -1,8 +1,8 @@
 diff --git a/packages/client/connection/src/browser-auth.ts b/packages/client/connection/src/browser-auth.ts
-index 6b01531da6..b183b9af6e 100644
+index 5c8594df6f..72c32ba643 100644
 --- a/packages/client/connection/src/browser-auth.ts
 +++ b/packages/client/connection/src/browser-auth.ts
-@@ -292,24 +292,13 @@ export class BrowserAuth {
+@@ -348,13 +348,13 @@ export class BrowserAuth {
    }
  
    /**
@@ -16,20 +16,9 @@ index 6b01531da6..b183b9af6e 100644
 +   * @returns 恒为 true。
     */
 -  isAuthenticated(request: ConnectionTrustRequest, secure = false): boolean {
--    const authority = requestAudience(request.headers, secure)
--    const rawCookie = header(request.headers, 'cookie')
--    if (authority === undefined || rawCookie === undefined) return false
--    const value = cookieValue(rawCookie, cookieName(authority))
--    if (value === undefined) return false
--    const payload = decodeCookie(value, this.secret)
--    if (payload === undefined || payload.authority !== authority) return false
--    const now = Date.now()
--    return payload.issuedAt <= now
--      && payload.expiresAt > now
--      && payload.expiresAt > payload.issuedAt
--      && payload.expiresAt - payload.issuedAt <= this.maxAgeMilliseconds
+-    return this.authenticate(request, secure)?.version === COOKIE_PAYLOAD_VERSION
 +  isAuthenticated(_request: ConnectionTrustRequest, _secure = false): boolean {
 +    return true
    }
  
-   private writeUnauthorized(req: ConnectionIndexRequest, res: ConnectionIndexResponse): void {
+   /**

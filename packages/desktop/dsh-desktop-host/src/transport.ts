@@ -103,9 +103,14 @@ export const DESKTOP_TRANSPORT_SCRIPT = `globalThis.__DSH_TRANSPORT__={
 }
 console.info('[dsh-desktop] transport installed',Object.keys(globalThis.__DSH_TRANSPORT__))`;
 interface BrowserAuthSurface {
+  /** 桌面形态下这棵树的流代表的 peer：已认证浏览器连接共享的 owner Peer（上游 `HostConnectionService`）。 */
+  readonly browserPeer: PeerScope;
   requestRejection(request: unknown): number | undefined;
   authorizeIndex(request: unknown, response: unknown): boolean;
 }
+
+/** 流开口的 peer 形参类型：上游签名一改这里跟着改（见 `GatewaySurface` 的同一考虑）。 */
+type PeerScope = Parameters<TypertGatewayWireStream["open"]>[3];
 
 interface GatewaySurface {
   // 直接用上游导出的签名：它变参数时我们编译即报错，抄一份会静默失效成运行时 TypeError。
@@ -178,6 +183,15 @@ function streamHandler(ctx: Context): (req: IncomingMessage, res: ServerResponse
       response.end("gateway unavailable");
       return;
     }
+    // 上游 0.2.1-alpha.4 起 `wireStream.open` 的 peer 必填：桌面这条流代表的就是浏览器那个 owner Peer
+    // （认证已被 `takeOverDesktopAuthentication` 放行，见上）。
+    const peer = (ctx.get("connection") as unknown as BrowserAuthSurface | undefined)?.browserPeer;
+    if (peer === undefined) {
+      reportStreamFailure("stream failed", "connection service is missing", ctx.logger);
+      response.writeHead(503);
+      response.end("connection unavailable");
+      return;
+    }
     const endpointFromQuery = new URL(request.url ?? "/", "http://127.0.0.1").searchParams.get(
       "endpoint",
     );
@@ -213,7 +227,7 @@ function streamHandler(ctx: Context): (req: IncomingMessage, res: ServerResponse
         endpoint,
         opening.payload,
         frames,
-        undefined,
+        peer,
         abort.signal,
       );
       ctx.logger.debug(`[dsh-desktop] stream opened ${endpoint}`);

@@ -51,6 +51,9 @@ function srcCandidates(target: string): string[] | undefined {
   if (normalized.startsWith("lib/types/")) rest = normalized.slice("lib/types/".length);
   else if (normalized.startsWith("lib/")) rest = normalized.slice("lib/".length);
   else return undefined;
+  // 上游 client 半的双面产物（`dualClient`：`client.node.js` 与 `client.browser.js` 由**同一个入口**
+  // `src/client/index.ts` 出两份，见其 `tsdown.client.ts`）在源码面就是那一个入口。
+  rest = rest.replace(/^client\.(?:node|browser)\.js$/u, "client/index.js");
   // `.cjs` 与 `.js` 同源：dual ESM/CJS 包（schemastery）的条件分支在源码面是同一份 src。
   rest = rest
     .replace(/\.d\.ts$/, "")

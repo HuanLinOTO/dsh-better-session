@@ -5,7 +5,7 @@ import { Context } from "@deepseek-ai/cordis";
 import AgentLoop from "@deepseek-ai/dsh-agent-loop";
 import { mountAgentLoopTestDependencies } from "@deepseek-ai/dsh-agent-loop-testkit";
 import { SessionId } from "@deepseek-ai/dsh-session";
-import JsonlSessionPersistence from "@deepseek-ai/dsh-session-persistence-jsonl";
+import * as JsonlSessionPersistence from "@deepseek-ai/dsh-session-persistence-jsonl";
 import * as SubagentSpawn from "@deepseek-ai/dsh-subagent-spawn-in-process";
 import * as toolSubagentControl from "@deepseek-ai/dsh-tool-subagent-control";
 import { afterEach, describe, expect, it, vi } from "vitest";

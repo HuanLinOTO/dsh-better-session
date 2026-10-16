@@ -9,5 +9,13 @@ sync: _deps
 patch: _deps
     pnx --package={{ upstream-sync-source }} upstream-sync patch
 
+# 按需 vendored 的上游内部文件（复制进各本地包的 `src/vendor/<短名>/`，见清单 `vendored.ts`）。
+vendor: _deps
+    pnx --package={{ upstream-sync-source }} upstream-sync vendor
+
+# CI：只比对 vendored 快照与上游，不写。
+vendor-check: _deps
+    pnx --package={{ upstream-sync-source }} upstream-sync vendor-check
+
 prebuild: _deps
     pnx --package={{ upstream-sync-source }} upstream-sync prebuild

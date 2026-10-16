@@ -11,7 +11,7 @@ import {
   type StreamChunk,
 } from "@deepseek-ai/dsh-llm";
 import { SessionId, type Session } from "@deepseek-ai/dsh-session";
-import JsonlSessionPersistence from "@deepseek-ai/dsh-session-persistence-jsonl";
+import * as JsonlSessionPersistence from "@deepseek-ai/dsh-session-persistence-jsonl";
 import { afterEach, describe, expect, it } from "vitest";
 import * as plugin from "../index.ts";
 

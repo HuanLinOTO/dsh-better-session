@@ -27,7 +27,6 @@ export class FakeScope implements ConfigForm<Section> {
       user: undefined,
       writable: true,
       revision: 7,
-      mode: "host",
       ...overrides,
     };
   }

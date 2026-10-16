@@ -216,7 +216,7 @@ export function apply(ctx: Context): void {
       }
       void scope.remote
         .$mount(SESSION_MODE_CATALOG_REMOTE)
-        .then(async (dispose) => {
+        .then(async (dispose: () => Promise<void>) => {
           disposeMount = dispose;
           const listed = await remoteNamespace<SessionModeCatalogRemote>(scope, CATALOG_NS)?.list();
           if (listed?.ok !== true) return;

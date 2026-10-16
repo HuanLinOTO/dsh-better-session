@@ -1,37 +1,48 @@
 diff --git a/packages/typert/protocol/src/index.ts b/packages/typert/protocol/src/index.ts
-index f94096beb3..a8527ea42f 100644
+index e2af8932b6..71ee6cbf38 100644
 --- a/packages/typert/protocol/src/index.ts
 +++ b/packages/typert/protocol/src/index.ts
-@@ -110,10 +110,18 @@ export interface RemoteMethodOptions {
-   readonly mode: 'stream'
+@@ -177,15 +177,25 @@ export interface RemoteMethodOptions<WireArgs extends readonly unknown[] = never
  }
+ 
+ /** A decorator whose `resources` readers were checked against the decorated method's parameters. */
+-type RemoteTypedMethodDecorator<This extends object, Args extends unknown[], Result> = (
+-  method: (this: This, ...args: Args) => Result,
+-  context: ClassMethodDecoratorContext<This, (this: This, ...args: Args) => Result>,
+-) => void
++type RemoteTypedMethodDecorator<This extends object, Args extends unknown[], Result> = {
++  (
++    method: (this: This, ...args: Args) => Result,
++    context: ClassMethodDecoratorContext<This, (this: This, ...args: Args) => Result>,
++  ): void
++  // 本地 patch（patches/decorator-dual-protocol.patch）：类型面同时收两种装饰器协议——标准（TC39）是
++  // `(method, context)`，legacy 是 `(target, propertyKey, descriptor)`（oxc 的 legacy 降级产物走这条）。
++  // 只留标准那一条签名时，开着 `experimentalDecorators` 的宿主 program 会在 `@Remote({…})` 上报 TS1241。
++  (...legacy: any[]): void
++}
  
 -type RemoteMethodDecorator = <This extends object, Args extends unknown[], Result>(
 -  method: (this: This, ...args: Args) => Result,
 -  context: ClassMethodDecoratorContext<This, (this: This, ...args: Args) => Result>,
 -) => void
-+// 本地 patch（patches/decorator-dual-protocol.patch）：类型面同时收两种装饰器协议——标准（TC39）是
-+// `(method, context)`，legacy 是 `(target, propertyKey, descriptor)`（oxc 的 legacy 降级产物走这条，
-+// `remoteDecorator` 按第二个实参的形状分路）。只留 TC39 那一条签名时，开着 `experimentalDecorators`
-+// 的宿主 program 会在 `@Remote(…)` 上报 TS1241。
 +type RemoteMethodDecorator = {
 +  <This extends object, Args extends unknown[], Result>(
 +    method: (this: This, ...args: Args) => Result,
 +    context: ClassMethodDecoratorContext<This, (this: This, ...args: Args) => Result>,
 +  ): void
-+  // legacy 协议这次的实参形状由运行时判别，这里只把这次调用收下（见 `legacyMethodName`）。
++  // 本地 patch：同 `RemoteTypedMethodDecorator`，`@Remote('name')` / `@RemoteScope(key)` 的 legacy 调用走这条。
 +  (...legacy: any[]): void
 +}
  
  interface RemoteInitializerContext<This extends object> {
    readonly private: boolean
-@@ -205,22 +213,48 @@ export function Remote<This extends object, Args extends unknown[], Result>(
-  * @returns a standard method decorator.
-  */
- export function Remote(option: string | RemoteMethodOptions): RemoteMethodDecorator
+@@ -293,22 +303,47 @@ export function Remote(name: string): RemoteMethodDecorator
+ export function Remote<This extends object, Args extends unknown[], Result>(
+   options: NoInfer<RemoteMethodOptions<RemoteWireArgs<Args>>>,
+ ): RemoteTypedMethodDecorator<This, Args, Result>
 +// 本地 patch（patches/decorator-dual-protocol.patch）：类型面把 legacy 那条调用也写下来——legacy 协议下
-+// 裸 `@Remote` 以 `(target, propertyKey, descriptor)` 被调用（第一个实参是 prototype），实现按第二个实参
-+// 的形状分路（见下面的 `legacyMethodName`）。放在工厂那条之后，免得 `@Remote({…})` 落到这条上。
++// 裸 `@Remote` 以 `(target, propertyKey, descriptor)` 被调用（第一个实参是 prototype），实现按第二个实参的
++// 类型分路。放在工厂那两条之后，免得 `@Remote({…})` 落到这条上。
 +export function Remote(
 +  methodExportOrOptions: string | RemoteMethodOptions | object,
 +  propertyKey?: string | symbol,
@@ -52,22 +63,21 @@ index f94096beb3..a8527ea42f 100644
  ): void | RemoteMethodDecorator {
    if (typeof methodExportOrOptions === 'string') {
      validateName('Remote export name', methodExportOrOptions)
-     return remoteDecorator({ kind: 'direct' }, undefined, methodExportOrOptions)
+     return remoteDecorator({ kind: 'direct' }, { exportName: methodExportOrOptions })
    }
    if (typeof methodExportOrOptions === 'object') {
 +    // 本地 patch（patches/decorator-dual-protocol.patch）：legacy 装饰器协议下裸 `@Remote` 以
 +    // `(target, propertyKey, descriptor)` 调用，第一个实参是 prototype——第二个实参是方法名而不是 context。
-+    // oxc 的 legacy 降级产物走这条路径；TC39 降级（esbuild）仍走下面的标准路径。
-+    const legacyName = legacyMethodName(context)
-+    if (legacyName !== undefined) {
-+      mark(methodExportOrOptions, legacyName, { kind: 'direct' })
++    // oxc 的 legacy 降级产物走这条路径；TC39 降级仍走下面的标准路径。
++    if (typeof context === 'string') {
++      mark(methodExportOrOptions, context, { kind: 'direct' }, {})
 +      return
 +    }
-     if (remoteOptionMode(methodExportOrOptions) !== 'stream'
-       || Reflect.ownKeys(methodExportOrOptions).length !== 1) {
-       throw new TypeError('typert-protocol: Remote options must contain exactly mode: "stream"')
-     }
-     return remoteDecorator({ kind: 'direct' }, 'stream')
+     return remoteDecorator({ kind: 'direct' }, markerOptions(
+       methodExportOrOptions,
+       REMOTE_OPTION_KEYS,
+       'Remote options require name, mode: "stream", or resources',
+     ))
    }
 -  if (context === undefined) throw new TypeError('typert-protocol: Remote decorator context is missing')
 +  // 第二个实参不是标准 context（legacy 传的是 propertyKey，或没有）时，这条调用不是标准协议。
@@ -77,30 +87,26 @@ index f94096beb3..a8527ea42f 100644
    addMarkerInitializer(context, { kind: 'direct' })
  }
  
-@@ -228,6 +262,11 @@ function remoteOptionMode(options: object): unknown {
-   return Reflect.get(options, 'mode') as unknown
- }
- 
-+// 本地 patch 的协议判别：legacy 把 propertyKey 作为第二个实参传入（string），标准传的是 context 对象。
-+function legacyMethodName(key: unknown): string | undefined {
-+  return typeof key === 'string' ? key : undefined
-+}
-+
- function remoteDecorator(
-   invocation: RemoteInvocationMarker,
-   mode?: 'stream',
-@@ -237,6 +276,13 @@ function remoteDecorator(
+@@ -350,8 +385,20 @@ function remoteDecorator(
+ ): RemoteMethodDecorator {
+   return function <This extends object, Args extends unknown[], Result>(
      _method: (this: This, ...args: Args) => Result,
-     context: ClassMethodDecoratorContext<This, (this: This, ...args: Args) => Result>,
+-    context: ClassMethodDecoratorContext<This, (this: This, ...args: Args) => Result>,
++    context:
++      | ClassMethodDecoratorContext<This, (this: This, ...args: Args) => Result>
++      | string
++      | symbol,
    ): void {
 +    // 本地 patch：legacy 调用是 `(target, propertyKey, descriptor)`，标准调用是 `(method, context)`。
 +    const target: unknown = _method
-+    const legacyName = legacyMethodName(context)
-+    if (typeof target === 'object' && target !== null && legacyName !== undefined) {
-+      mark(target, legacyName, invocation, mode, exportName)
++    if (typeof context === 'string' && typeof target === 'object' && target !== null) {
++      mark(target, context, invocation, options)
 +      return
 +    }
-     addMarkerInitializer(context, invocation, mode, exportName)
++    if (typeof context !== 'object' || context === null) {
++      throw new TypeError('typert-protocol: Remote decorator context is missing')
++    }
+     addMarkerInitializer(context, invocation, options)
    }
  }
 diff --git a/vendor/cordis/src/registry.ts b/vendor/cordis/src/registry.ts
