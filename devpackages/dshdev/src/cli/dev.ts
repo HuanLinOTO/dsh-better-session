@@ -18,12 +18,21 @@ import {
   workspaceManifest,
 } from "./workspace.ts";
 
-function debugPort(name: string, fallback: number): number {
+/**
+ * 调试端口：`0` 表示"向系统要一个"。
+ *
+ * 默认就是 0（而不是某个固定端口）——固定端口会让第二个实例、或本机上别的工具占了它时直接起不来
+ * （`Starting inspector on 127.0.0.1:9229 failed: address already in use`）。要连的时候看各进程自己打的
+ * `Debugger listening on ws://127.0.0.1:<port>/…` / `DevTools listening on ws://…`。
+ * @param name - 环境变量名（显式指定端口时用它）。
+ * @returns 端口号，0 表示由系统分配。
+ */
+function debugPort(name: string): number {
   const value = process.env[name];
-  if (value === undefined || value === "") return fallback;
+  if (value === undefined || value === "") return 0;
   const port = Number(value);
-  if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
-    throw new Error(`${name} must be an integer from 1 through 65535`);
+  if (!Number.isSafeInteger(port) || port < 0 || port > 65_535) {
+    throw new Error(`${name} must be an integer from 0 through 65535`);
   }
   return port;
 }
@@ -106,11 +115,9 @@ async function launchElectron(
   const electron: unknown = require("electron");
   if (typeof electron !== "string")
     throw new Error("desktop development: electron executable is unavailable");
-  const mainPort = debugPort("DSH_DESKTOP_MAIN_INSPECT_PORT", 9229);
-  const rendererPort = debugPort("DSH_DESKTOP_RENDERER_DEBUG_PORT", 9222);
-  // 9231 而不是 9230：那是上游 `experimental-inspector` 的 Worker 默认端口，桌面档装着那条行时
-  // 两者会抢同一个端口，抢输的是整条 inspector 行（Worker 起不来 → 行回滚）。
-  const hostPort = debugPort("DSH_DESKTOP_HOST_INSPECT_PORT", 9231);
+  const mainPort = debugPort("DSH_DESKTOP_MAIN_INSPECT_PORT");
+  const rendererPort = debugPort("DSH_DESKTOP_RENDERER_DEBUG_PORT");
+  const hostPort = debugPort("DSH_DESKTOP_HOST_INSPECT_PORT");
   const developmentRoot = join(buildCacheDir, "development");
   // 数据面与 `dev --web` 共用工作区 store；只有浏览器数据留在构建目录里。
   const userData = join(developmentRoot, "electron-user-data");
@@ -135,7 +142,8 @@ async function launchElectron(
   log.info(`DSH_HOME=${dataDir}`);
   log.info(`profile root=${profileDir} runtime=${runtimeDir}`);
   log.info(
-    `inspectors main=${String(mainPort)}, renderer=${String(rendererPort)}, host=${String(hostPort)}`,
+    `inspectors main=${String(mainPort)}, renderer=${String(rendererPort)}, host=${String(hostPort)}` +
+      "（0 = 由系统分配，实际端口见各进程自己打的 Debugger/DevTools listening 行）",
   );
   await run(
     electron,
