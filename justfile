@@ -40,10 +40,16 @@ clean-dist:
 fmt:
     pnpm exec oxfmt .
 
-# 我们自己的规矩的检查工具（不是测试）：包面（`dsh.bundle` 的包才有 locale 那套）与运行期依赖声明。
+# 我们自己的规矩的检查工具（不是测试）：包面（`dsh.bundle` 的包才有 locale 那套）与运行期依赖声明，
+# 外加文档的两条硬规矩——行内代码里像工作区路径的东西要解析得到真实文件、md 链接要存在
+# （判据与例外表见 `.agents/standards/describing-facts.md`）。文档那两条住在 devkit 的 spec 里，这里定向跑；
+# `just test` 跑全仓时同样覆盖它们。
 lint:
     pnpm exec oxlint .
     pnpm exec dshdev check-locale
+    pnpm exec vitest run --reporter=dot \
+        devpackages/devkit/src/__tests__/doc-references.spec.ts \
+        devpackages/devkit/src/__tests__/markdown-links.spec.ts
 
 # 发布一律走 CI；这一条是 CI 的发布步骤（逐包唤起，只发 `@morlay/*` 里版本是新的那些）。
 publish:
