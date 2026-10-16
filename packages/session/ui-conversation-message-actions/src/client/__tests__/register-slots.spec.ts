@@ -49,7 +49,12 @@ describe("chat-node 的槽注册面", () => {
       registerChatNodeRenderers(slotsFacade(core), () => ({ face: {} }) as never),
     ).not.toThrow();
     const entries = core.entries("conversation.chat.node");
-    expect(entries.map((entry) => entry.options.key).sort()).toEqual(["steering", "user"]);
+    // 两条 keyed entry 都在（顺序不参与判定：注册顺序是内部细节）。
+    expect(
+      entries
+        .map((entry) => entry.options.key)
+        .sort((left, right) => String(left).localeCompare(String(right))),
+    ).toEqual(["steering", "user"]);
     for (const entry of entries) {
       // 覆盖官方那两条的注册面：priority 更低（lowest renders，我们这份生效）、locale 与行一致、
       // inject 面在场（编辑 / 重试的 face 从这里来）。

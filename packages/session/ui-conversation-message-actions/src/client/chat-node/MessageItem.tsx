@@ -22,8 +22,9 @@ import type {
 } from "@deepseek-ai/dsh-client-ui-chat/client";
 import type { UserTextFacts } from "@deepseek-ai/dsh-client-ui-conversation/client";
 // 动作行整条用上游那份：复制 / 分支 / 时间标签的悬停显形都归它，我们只经它的 `extraActions` 注入自己的两个入口。
-// 按**包名**引（上游 `exports` 里有 `./src/*`）：走相对路径等于把 vendor 的目录布局抄进代码，闭包面
-// （`node_modules/.pnpm/…`，部署形态）里深度对不上就解析不到——开发态恰好因为目录层级吻合而看不出来。
+// 这份是**从上游按需复制**进 `src/vendor/` 的副本（清单在 `scripts/upstream-sync/src/vendored.ts`，`import` 走包内
+// 相对路径）：上游把内部实现文件摊成包出口会让打包边界跟着乱（同一个包既按出口引、又按源码路径引），所以复制
+// 进来而不是按包名引。
 import { MessageIconActions } from "../../vendor/dsh-client-ui-chat/client/chat/MessageIconActions.tsx";
 import type { EditableMessageBlock } from "../../shared.ts";
 import type { SessionEditorFace } from "../controller.ts";
