@@ -1,6 +1,6 @@
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { format } from "node:util";
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, protocol } from "./electron.ts";
 
@@ -107,17 +107,42 @@ interface RuntimeResources {
   readonly loader: string;
 }
 
-function runtimeResources(): RuntimeResources {
+/**
+ * 打包形态下"当 node 用"的可执行文件。
+ *
+ * macOS 上 spawn 主二进制（`process.execPath`）会让系统**多出一个叫 `exec` 的 Dock 图标**——它落在 `.app`
+ * 里、被当成 GUI 应用注册。改用同 bundle 的 **Helper**（它的 `Info.plist` 带 `LSUIElement`）就没有这个图标，
+ * 而 `ELECTRON_RUN_AS_NODE` 对它一样生效。其余平台/形态直接用 `process.execPath`。
+ * @returns 可执行文件的绝对路径。
+ */
+async function nodeExecutableOf(): Promise<string> {
+  if (process.platform === "darwin") {
+    const app = basename(process.execPath);
+    const helper = join(
+      dirname(process.execPath),
+      "..",
+      "Frameworks",
+      `${app} Helper.app`,
+      "Contents",
+      "MacOS",
+      `${app} Helper`,
+    );
+    if (await pathExistsOf(helper)) return helper;
+  }
+  return process.execPath;
+}
+
+async function runtimeResources(): Promise<RuntimeResources> {
   // 两种形态的"随包载荷"位置都能自己推出来：
   // - 打包：`Resources/{runtime,seed}`；
   // - dev：壳跑在装配目录 `<buildCache>/shell`，于是同级的 `../{runtime,seed}`——工具因此**不需要**把这些
   //   路径注入进来（dev 的宿主用系统 node，PATH 上就有）。
   const resourcesDir =
     developmentLayout() === undefined ? process.resourcesPath : join(shellRoot(), "..");
-  // 宿主的 node：打包形态用 **Electron 自己的二进制**（上游同款：`main.ts` 的 `const node = process.execPath`
+  // 宿主的 node：打包形态用 **Electron 的二进制**（上游同款：`main.ts` 的 `const node = process.execPath`
   // 与 `node-environment.ts` 的 `ELECTRON_RUN_AS_NODE`）。随包因此不再需要一份 node；而且宿主也能读 asar
   // （asar 补丁在 `ELECTRON_RUN_AS_NODE` 下照样生效）——app 才能整块打进 asar。dev 形态用系统 node。
-  const node = developmentLayout() === undefined ? process.execPath : "node";
+  const node = developmentLayout() === undefined ? await nodeExecutableOf() : "node";
   const seed = join(resourcesDir, "seed");
   return {
     node,
@@ -267,9 +292,17 @@ async function shellLog(message: string, ...args: readonly unknown[]): Promise<v
 }
 
 
+/** 文件在不在（项目禁同步 IO）。 */
+async function pathExistsOf(path: string): Promise<boolean> {
+  return await access(path).then(
+    () => true,
+    () => false,
+  );
+}
+
 async function main(): Promise<void> {
   const development = developmentLayout();
-  const resources = runtimeResources();
+  const resources = await runtimeResources();
   const hostInspectPort = developmentHostInspectPort(development !== undefined);
   const profileDir =
     development?.profileDir ?? join(resolveDshHome(appConfig) ?? "", "profiles", PROFILE_NAME);
