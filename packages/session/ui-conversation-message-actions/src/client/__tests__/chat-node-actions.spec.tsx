@@ -45,24 +45,21 @@ function renderNode(
   faces: { recall: ReturnType<typeof vi.fn>; retry: ReturnType<typeof vi.fn> },
 ): void {
   // keyed 渲染器的 props 由 slot 面注入：这里只给门控逻辑关心的那几个。
+  // 内容整块由上游工厂渲染（`conversation.chat.user.content`），测试里只回一个标记位。
   const View = UserMessageNodeView as unknown as (props: {
     node: unknown;
-    renderSlot: unknown;
+    renderFactorySlot: unknown;
     loadImage: unknown;
     t: unknown;
-    openFile: (path: string) => void;
-    openSkill: (name: string) => void;
     recall: unknown;
     retry: unknown;
   }) => ReactNode;
   render(
     <View
       node={node}
-      renderSlot={() => null}
+      renderFactorySlot={() => <span data-testid="user-content" />}
       loadImage={() => undefined}
       t={t}
-      openFile={() => {}}
-      openSkill={() => {}}
       recall={faces.recall}
       retry={faces.retry}
     />,

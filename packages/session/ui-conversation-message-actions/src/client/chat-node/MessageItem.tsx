@@ -2,24 +2,25 @@
 // 在消息动作行上提供 edit / retry；其余 key 由官方内置渲染器处理。
 
 import {
-  Bubble,
   Button,
   IconButton,
   IconEditOutlineRegular,
   IconRefreshOutlineRegular,
-  JsonBlock,
-  markdownLabels,
   Modal,
-  ReferenceMarkdown,
   Row,
   Stack,
-  type ReferenceActions,
 } from "@morlay/dsh-client-ui-primitives";
 import { memo, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import type { InjectFace } from "@deepseek-ai/dsh-client-ui-slots";
-import type { UserMessageNode } from "@deepseek-ai/dsh-client-ui-chat/client";
-import type { ChatNodeViewProps, ChatViewSlotProps } from "@deepseek-ai/dsh-client-ui-chat/client";
+import type { InjectFace, PropsRenderFactories } from "@deepseek-ai/dsh-client-ui-slots";
+import type {
+  ChatNodeOwnerProps,
+  ChatNodeViewProps,
+  UserContentAttachment,
+  UserContentData,
+  UserMessageNode,
+} from "@deepseek-ai/dsh-client-ui-chat/client";
+import type { UserTextFacts } from "@deepseek-ai/dsh-client-ui-conversation/client";
 // 动作行整条用上游那份：复制 / 分支 / 时间标签的悬停显形都归它，我们只经它的 `extraActions` 注入自己的两个入口。
 // 按**包名**引（上游 `exports` 里有 `./src/*`）：走相对路径等于把 vendor 的目录布局抄进代码，闭包面
 // （`node_modules/.pnpm/…`，部署形态）里深度对不上就解析不到——开发态恰好因为目录层级吻合而看不出来。
@@ -29,65 +30,65 @@ import type { SessionEditorFace } from "../controller.ts";
 
 type UserImage = Extract<UserMessageNode["content"][number], { type: "image" }>;
 
+// 内容拆成官方工厂要的三份：文本、按原顺序的附件、其余块。呈现（含图片槽）归工厂。
 function contentParts(content: readonly unknown[]): {
   text: string;
   texts: string[];
-  images: { attachment: UserImage["attachment"] }[];
+  attachments: UserContentAttachment[];
   rest: unknown[];
 } {
   const texts: string[] = [];
-  const images: { attachment: UserImage["attachment"] }[] = [];
+  const attachments: UserContentAttachment[] = [];
   const rest: unknown[] = [];
   for (const block of content) {
     const b = block as { type?: string; text?: string; attachment?: unknown };
     if (b.type === "text" && typeof b.text === "string") texts.push(b.text);
     else if (b.type === "image" && b.attachment !== undefined) {
-      images.push({ attachment: (b as UserImage).attachment });
+      attachments.push({ type: "image", image: { attachment: (b as UserImage).attachment } });
     } else rest.push(block);
   }
   // 多块消息按空行拼回 raw markdown（新式提交就是单块原文）；撤回回填用的是 texts（全部块）。
-  return { text: texts.join("\n\n"), texts, images, rest };
+  return { text: texts.join("\n\n"), texts, attachments, rest };
 }
 
 function UserStyleBubble({
   content,
+  referenceLabels,
+  skillNames,
+  loadImage,
+  renderFactorySlot,
   actions,
-  references,
-  t,
 }: {
   content: readonly unknown[];
+  referenceLabels?: readonly string[] | undefined;
+  skillNames?: readonly string[] | undefined;
+  loadImage: ChatNodeOwnerProps["loadImage"];
+  renderFactorySlot: PropsRenderFactories["renderFactorySlot"];
   actions?: (text: string) => ReactNode;
-  // 引用 chip 的点击目标（owner props；缺省时 chip 照常渲染但点击无效果）。
-  references?: ReferenceActions | undefined;
-  t: ChatViewSlotProps["t"];
 }): ReactNode {
-  const { text, rest } = contentParts(content);
-  const truncated = (total: number): string => t("json.truncated", { total });
-  // labels 按 locale revision 稳定（官方 MarkdownText 在它上面 memo 渲染缓存）。
-  const labels = useMemo(() => markdownLabels(t), [t]);
-  const showBubble = text !== "" || rest.length > 0;
+  const parts = useMemo(() => contentParts(content), [content]);
+  const prepared = useMemo<UserContentData>(() => ({
+    text: parts.text,
+    attachments: parts.attachments,
+    extraBlocks: parts.rest,
+    ...(referenceLabels === undefined ? {} : { referenceLabels }),
+  }), [parts, referenceLabels]);
+  const facts = useMemo<Readonly<Partial<UserTextFacts>>>(() => ({
+    ...(referenceLabels === undefined ? {} : { sessionLabels: referenceLabels }),
+    ...(skillNames === undefined ? {} : { skillNames }),
+  }), [referenceLabels, skillNames]);
   return (
     <Stack align="end" gap={6} data-time-hover-root>
-      <Stack align="end" gap={8} narrow>
-        {/* TODO(上游 0.2.1-alpha.4)：用户消息的图片不能再从这个 shadow 渲染器里渲染——
-            `conversation.chat.user.images` 的声明权归上游 factory `conversation.chat.user.content`
-            （重复声明即抛错，注册会失败、整个渲染器回落到官方那份），而 factory 是整块内容，
-            只能连文本一起交回。接法待定，见设计 20260917-对话UI重构 的槽占用面。 */}
-        {showBubble && (
-          <Bubble>
-            <ReferenceMarkdown text={text} labels={labels} actions={references} />
-            {rest.map((block, i) => (
-              <JsonBlock
-                key={i}
-                label={t("message.extraBlock")}
-                payload={block}
-                truncatedLabel={truncated}
-              />
-            ))}
-          </Bubble>
-        )}
-      </Stack>
-      {actions?.(text)}
+      {/* 内容整块交回上游工厂 `conversation.chat.user.content`：附件（含图片槽 `user.images`）、文本与
+          引用呈现都归它——那个槽的声明权在工厂手里，shadow 渲染器自己渲染会被拒（重复声明即抛）。
+          这里只保留我们自己的动作行。 */}
+      {renderFactorySlot("conversation.chat.user.content", {
+        content: prepared,
+        loadImage,
+        facts,
+        interactive: true,
+      })}
+      {actions?.(prepared.text)}
     </Stack>
   );
 }
@@ -95,15 +96,11 @@ function UserStyleBubble({
 export const UserMessageNodeView = memo(function UserMessageNodeView({
   node,
   t,
-  openFile,
-  openSkill,
+  loadImage,
+  renderFactorySlot,
   recall,
   retry,
-}: ChatNodeViewProps<"user" | "steering"> & {
-  // keyed 渲染器由 owner props 展开调用：引用 chip 的点击目标从这里来。
-  openFile: (path: string) => void;
-  openSkill: (name: string) => void;
-} & InjectFace<SessionEditorFace>) {
+}: ChatNodeViewProps<"user" | "steering"> & InjectFace<SessionEditorFace>) {
   const data = node.data;
   // 撤回回填的文本：该消息的全部文本块（撤回截断整条消息，只回填首块会丢内容）。
   const recallTexts = contentParts(data.content).texts;
@@ -198,8 +195,10 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
       )}
       <UserStyleBubble
         content={data.content}
-        references={{ openFile, openSkill }}
-        t={t}
+        {...(data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels })}
+        {...(data.skillNames === undefined ? {} : { skillNames: data.skillNames })}
+        loadImage={loadImage}
+        renderFactorySlot={renderFactorySlot}
         actions={(text) => (
           <MessageIconActions
             text={text}
