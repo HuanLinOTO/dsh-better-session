@@ -12,17 +12,13 @@
 （只提问与联网）、`noop`（**原样模式**：一份什么都不加的扩展——persona 空、名单全空、三个开关走默认，装配结果与
 "没有模式"时一致；想按上游默认跑、或排查扩展干扰时的对照档）。
 
-**按会话收口也在这个包里**（[`src/scope.ts`](./src/scope.ts)，模式行内部持有、不发布服务）：工具目录与
-`tool:<工具名>` section 按同一份合成结果过滤、执行层 guard 挂在该 agent 的 ctx 上（同一份 guard 也按名拒 `skill`
-工具要加载的那一件技能）、技能目录按技能名单删掉被拒的那几行、三个开关
-（`instructions` / `skills` / `runtimeContext`）按会话生效——其中 `instructions: false` 与 `skills: false` 是在
-`agent/pre-step` 上**丢掉官方两条注入面**（工作区指令、技能目录）。取舍见
-[设计 抑制官方注入面](./.agents/designs/20260929-抑制官方注入面.md)。
-
-这三个开关管的是**每步请求里额外塞进去的文本**（不是工具本身，工具可见性归 `allowTools` / `denyTools`）：
-`instructions` = 官方 `agent-instructions` 的每步注入（`AGENTS.md` 之类的工作区指令）加本通道自己的降级注入；
-`skills` = 官方 `tool-skill` 的**技能目录**（那份 `- 名字: 说明` 列表，`skill` 工具本身照旧可见）；`runtimeContext` =
-两条动态快照（文件沙箱策略、审批策略）。
+**按会话收口也在这个包里**（[`src/scope.ts`](./src/scope.ts)，模式行内部持有、不发布服务）：工具名单、三个开关
+（`instructions` / `skills` / `runtimeContext`）与上游那三条注入面（工作区指令 / 技能目录 / 时钟）都按会话生效。
+三个开关管的是**每步请求里额外塞进去的文本**（工具可见性归 `allowTools` / `denyTools`）：`instructions` 是官方
+`agent-instructions` 的每步注入（`AGENTS.md` 之类）加本通道自己的降级注入，`skills` 是官方 `tool-skill` 的
+**技能目录**（`skill` 工具本身照旧可见），`runtimeContext` 是两条动态快照（文件沙箱策略、审批策略）。
+机制、抑制面的取舍与代价见[设计 抑制官方注入面](./.agents/designs/20260929-抑制官方注入面.md)与
+[设计 会话模式](./.agents/designs/20260924-会话模式.md)。
 
 本包不装配任何行：装配入口在 [`@morlay/session-mode-profile`](../../bundles/session-mode-profile/README.md)
 （它插 `session-mode`、通道、工具说明与 subagent 那几行）。
