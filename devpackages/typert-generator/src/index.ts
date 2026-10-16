@@ -225,10 +225,14 @@ function signatureParametersOf(source: string, member: Node): string {
 
 /** 参数的 schema：可选参数（`options?`）在 wire 上是 `undefined | T`，`undefined` 排最前。 */
 function schemaOfParameter(
-  parameter: { type: Node | undefined; optional: boolean },
+  parameter: { type: Node | undefined; optional: boolean; idType?: string },
   context: Parameters<typeof zodOf>[1],
 ): string {
-  const inner = zodOf(parameter.type, context);
+  // scope 参数（`@RemoteScope`，或类型命中上下文查找表）在 wire 上传的是 **id**：descriptor 里写作
+  // `wire: 'agentId'` + `typeSymbol: '…#SessionId'`，即一个字符串 brand。schema 必须跟着 **wire 的类型**
+  // 走，不能按宿主侧那个上下文对象（`Agent`）生成——否则客户端发 `{ id: … }`、服务端按 `SessionId`
+  // 解析，gateway 直接判 `wire field "agentId" failed boundary validation`。
+  const inner = parameter.idType === undefined ? zodOf(parameter.type, context) : "z.string()";
   return parameter.optional ? `z.union([z.undefined(), ${inner}])` : inner;
 }
 
