@@ -137,10 +137,16 @@ export class DesktopHostProcess {
         : [`--inspect=127.0.0.1:${String(this.inspectPort)}`]),
       ...(this.options.nodeArgs ?? []),
       entry,
-      this.runtimeDir,
+      // 宿主入口的参数与 web 入口**同一套**（`@morlay/dsh-desktop-host` 的 `invocation.ts`）：壳只给
+      // 两格锚点与包通道，形态自己的内层参数（`--no-open` 等）由宿主入口自己补——传参形状两边一致，
+      // 才不会出现"dev 对、打包不对"这种只差一处的分歧。
+      "--profile-dir",
       this.profileDir,
-      // 桌面档不挂 Office 组合，argv 因此比上游少 `primaryRuntime` 那一格：profileDir 之后直接是 pnpm 与 node bin。
-      ...(packageManager === undefined ? [] : [packageManager.pnpm, packageManager.nodeBin]),
+      "--runtime-dir",
+      this.runtimeDir,
+      ...(packageManager === undefined
+        ? []
+        : ["--pnpm", packageManager.pnpm, "--node-bin", packageManager.nodeBin]),
     ];
     const env = {
       ...Object.fromEntries(

@@ -1,83 +1,42 @@
-// 桌面部署里的 host 进程入口：按 profile root 装配 Web 应用，并把请求经字节管道（FD 3/4）
-// 交给宿主内的无端口 `webServer`。argv：`[runtimeDir, profileDir, pnpmEntry?, nodeBin?]`；
-// IPC：`ready` / `fatal`，另收 `shutdown`。
+// 桌面宿主进程的**入口**：解析参数 → 装配 profile → 接线。就这三步——协议在
+// [`./desktop-ipc.ts`](./desktop-ipc.ts)、装配在 [`./app-boot.ts`](./app-boot.ts)、传输接管在
+// [`./transport.ts`](./transport.ts)、`webServer` 服务在 [`./webserver.ts`](./webserver.ts)。
 //
-// 装配走官方那两步（`loadProfileDirectory` + `runProfile`）：打包形态的 profile 由工具按官方形态
-// 种出（见 `../.agents/designs/20260929-桌面host的运行时面与依赖边界.md`）；dev 形态由启动器把
-// app 目录当 profile root 传进来（同一份清单，见 `../../dshdev/.agents/designs/20261010-app目录即profile-root.md`）。
+// argv 与 web 入口**同一套**（见 [`./invocation.ts`](./invocation.ts)）：
+// `--profile-dir <dir> --runtime-dir <dir> [--patch <file>]... [--pnpm <path> --node-bin <dir>] [-- <内层参数>]`；
+// 另加两条通道：请求/响应字节管道（FD 3/4）与 Node IPC（`ready` / `fatal` / `shutdown`）。
+// 装配层完全由 profile 的 `dsh.profile.bundles` 决定：打包形态的 profile 由工具按官方形态种出
+// （见 `../.agents/designs/20260929-桌面host的运行时面与依赖边界.md`）；dev 形态由启动器把 app 目录当
+// profile root 传进来（同一份清单，见 `../../dshdev/.agents/designs/20261010-app目录即profile-root.md`）。
 
-import { once } from "node:events";
-import { createReadStream, createWriteStream, type ReadStream, type WriteStream } from "node:fs";
-import { installAnchorOf } from "./app-boot.ts";
 import { fileURLToPath } from "node:url";
-import { inspect } from "node:util";
-import {
-  loadLayeredEnv,
-  loadProfileDirectory,
-  reportSkippedBundles,
-} from "@deepseek-ai/dsh-app-boot";
-import { runProfile } from "@deepseek-ai/dsh/profile-boot";
-import type {} from "@deepseek-ai/dsh-api-gateway";
-import type {} from "@deepseek-ai/dsh-client-connection";
-import type {} from "@deepseek-ai/dsh-host-webserver";
+import { bootAppProfile } from "./app-boot.ts";
+import { connectDesktopIpc } from "./desktop-ipc.ts";
+import { installDevtoolsAssets } from "./devtools-assets.ts";
+import { fatalEvent } from "./fatal.ts";
+import { parseHostInvocation } from "./invocation.ts";
+import { installPreloadSource } from "./preload-source.ts";
 import {
   DESKTOP_STREAM_PATH,
   desktopStreamStats,
   installDesktopTransport,
   takeOverDesktopAuthentication,
 } from "./transport.ts";
-import { applyInspectorCommand, closeInspectorEndpoint } from "./inspector.ts";
-import { installDevtoolsAssets } from "./devtools-assets.ts";
-import { installPreloadSource } from "./preload-source.ts";
+import type { PortlessWebServer } from "./webserver.ts";
+import { DESKTOP_HOST_PROTOCOL_VERSION, type DesktopHostEvent } from "./wire.ts";
 import { startLoopbackUpgradeServer } from "./ws-bridge.ts";
-import { PortlessWebServer } from "./webserver.ts";
-import {
-  DESKTOP_HOST_PROTOCOL_VERSION,
-  DESKTOP_PIPE_CHUNK_BYTES,
-  DESKTOP_REQUEST_PIPE_FD,
-  DESKTOP_RESPONSE_PIPE_FD,
-  DesktopHostRequestDecoder,
-  encodeDesktopResponseData,
-  encodeDesktopResponseEnd,
-  encodeDesktopResponseError,
-  encodeDesktopResponseStart,
-  isDesktopHostCommand,
-  type DesktopHostEvent,
-  type DesktopHostRequestFrame,
-} from "./wire.ts";
+import type {} from "@deepseek-ai/dsh-api-gateway";
+import type {} from "@deepseek-ai/dsh-client-connection";
+import type {} from "@deepseek-ai/dsh-host-webserver";
 
+// 桌面形态自己的 overlay：传输接管（无端口 webServer）+ 停掉登录/账号与产品遥测那几行。
 const DESKTOP_PATCH = fileURLToPath(new URL("../config/desktop.cordis.patch.yml", import.meta.url));
-
-interface PendingRequest {
-  readonly abort: AbortController;
-  body?: ReadableStreamDefaultController<Uint8Array>;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-// 诊断上限：壳把它写进日志，再长也没有额外价值。
-const MAX_FATAL_DIAGNOSTIC_CHARS = 64 * 1024;
-
-// fatal 事件：`message` 给壳的 dialog 用；`diagnostic` 是完整 `inspect`——stderr 字节与这条 IPC
-// 谁先到不确定，所以诊断跟 IPC 一起走。
-function fatalEvent(error: unknown): DesktopHostEvent {
-  return {
-    type: "fatal",
-    message: errorMessage(error),
-    diagnostic: inspect(error, { depth: 4, maxArrayLength: 50 }).slice(
-      0,
-      MAX_FATAL_DIAGNOSTIC_CHARS,
-    ),
-  };
-}
 
 // 按需的内存/流上报：默认关，`DSH_MEMORY_REPORT=1` 时每 5 秒一行。用来把「宿主内存一直在涨」
 // 落到具体哪条流、多少字节上（heapUsed 涨 = 转译/业务对象，external 涨 = 缓冲或原生件）。
 function reportMemoryWhenAsked(): void {
   if (process.env.DSH_MEMORY_REPORT !== "1") return;
-  const megabytes = (bytes: number): string => (bytes / 1024 / 1024).toFixed(0);
+  const megabytes = (value: number): string => (value / 1024 / 1024).toFixed(1);
   const timer = setInterval(() => {
     const memory = process.memoryUsage();
     console.error(
@@ -90,79 +49,37 @@ function reportMemoryWhenAsked(): void {
   timer.unref();
 }
 
+// 插件页的包操作通道：随包 node 跑随包 pnpm；`ELECTRON_RUN_AS_NODE` 让 Electron 把自己当 node 用。
+function packageManagerOf(pnpmEntry: string, nodeBin: string | undefined) {
+  return {
+    command: process.execPath,
+    args: ["--expose-internals", pnpmEntry],
+    env: {
+      ELECTRON_RUN_AS_NODE: "1",
+      DSH_DESKTOP_NODE_EXECUTABLE: process.execPath,
+      PATH: `${nodeBin ?? ""}${nodeBin === undefined ? "" : ":"}${process.env.PATH ?? ""}`,
+    },
+  };
+}
+
 async function main(): Promise<void> {
-  const runtimeDir = process.argv[2];
-  const profileDir = process.argv[3];
-  if (runtimeDir === undefined || profileDir === undefined || process.send === undefined)
+  const invocation = parseHostInvocation("dsh desktop", process.argv.slice(2));
+  if (process.send === undefined)
     throw new Error(
-      "dsh desktop: expected runtime and profile directories, byte pipes, and a Node IPC channel",
+      "dsh desktop: expected a Node IPC channel and the byte pipes on fd 3/4 (the shell owns them)",
     );
-  const pnpmEntry = process.argv[4];
-  const nodeBin = process.argv[5];
+  const { profileDir, runtimeDir, patches, pnpmEntry, nodeBin, inner } = invocation;
 
-  const requestPipe: ReadStream = createReadStream("", {
-    fd: DESKTOP_REQUEST_PIPE_FD,
-    autoClose: false,
-  });
-  const responsePipe: WriteStream = createWriteStream("", {
-    fd: DESKTOP_RESPONSE_PIPE_FD,
-    autoClose: false,
-  });
-  let responseTail: Promise<void> = Promise.resolve();
-  // 收尾阶段壳会关掉管道；此后不再写入，管道本身的错误也只在那一段里吞掉。
-  let closing = false;
-  responsePipe.on("error", (error) => {
-    if (!closing) {
-      console.error(error);
-      process.exitCode = 1;
-    }
-  });
-  const writeResponse = (frame: Buffer): Promise<void> => {
-    if (closing || responsePipe.destroyed) return Promise.resolve();
-    const write = responseTail.then(async () => {
-      if (closing || responsePipe.destroyed) return;
-      if (!responsePipe.write(frame)) await once(responsePipe, "drain");
-    });
-    responseTail = write.catch(() => undefined);
-    return write;
-  };
-  const send = (event: DesktopHostEvent): void => {
-    if (process.send === undefined || !process.connected) return;
-    try {
-      process.send(event);
-    } catch (error) {
-      // 父进程并发断开时只吞掉通道已关闭这一种；其余照常抛出。
-      if ((error as NodeJS.ErrnoException).code !== "ERR_IPC_CHANNEL_CLOSED") throw error;
-    }
-  };
-
-  // 闭包根 = **profile 自己**的 `node_modules`（随包 tar 解压出来的那份）：官方 bundles 与 `dsh` 由它解析。
-  // runtime 只放工具链，锚点挂过去会当场 `ENOENT: realpath …/runtime/node_modules/@deepseek-ai/dsh`。
-  const installAnchor = installAnchorOf(profileDir);
-  const profile = loadProfileDirectory("dsh", profileDir, installAnchor);
-  // 加载跳过原因由启动方上报（与上游 desktop-host 同一口径）。
-  reportSkippedBundles("dsh", profile);
-  const application = runProfile({
-    environment: loadLayeredEnv("dsh"),
+  // 装配走 [`./app-boot.ts`](./app-boot.ts) 那条路（与 web 形态同一份实现）：层由 profile 的
+  // `dsh.profile.bundles` 决定（各 bundle 自己的 patch 由 loader 按 `dsh.bundle.patch` 读），
+  // 这里只按顺序补两层 overlay：调用方给的（壳）+ 桌面形态自己的。
+  const application = bootAppProfile({
+    profileDir,
     profile: "desktop",
-    resolvedProfile: { profile, installAnchor },
-    // 装配**完全**由 profile 的 `dsh.profile.bundles` 决定（各 bundle 自己的 patch 由 loader 按
-    // `dsh.bundle.patch` 读）；这里只留桌面形态自己的那一层 overlay。
-    patchFiles: [DESKTOP_PATCH],
-    args: ["--no-open"],
-    ...(pnpmEntry === undefined
-      ? {}
-      : {
-          packageManager: {
-            command: process.execPath,
-            args: ["--expose-internals", pnpmEntry],
-            env: {
-              ELECTRON_RUN_AS_NODE: "1",
-              DSH_DESKTOP_NODE_EXECUTABLE: process.execPath,
-              PATH: `${nodeBin ?? ""}${nodeBin === undefined ? "" : ":"}${process.env.PATH ?? ""}`,
-            },
-          },
-        }),
+    patchFiles: [...patches, DESKTOP_PATCH],
+    // 桌面壳自己管窗口：不让 app 行去开浏览器；`--` 之后的内层参数排在其后。
+    args: ["--no-open", ...inner],
+    ...(pnpmEntry === undefined ? {} : { packageManager: packageManagerOf(pnpmEntry, nodeBin) }),
   });
 
   const { ctx } = await application;
@@ -178,158 +95,7 @@ async function main(): Promise<void> {
     installPreloadSource(ctx, { shellRoot });
   }
   const webServer = ctx.get("webServer") as unknown as PortlessWebServer;
-
-  const pending = new Map<number, PendingRequest>();
-  const runs = new Set<Promise<void>>();
-  const decoder = new DesktopHostRequestDecoder();
-  let lastStreamId = 0;
-  let stopping: Promise<void> | undefined;
-
-  const dispatch = async (
-    streamId: number,
-    request: Request,
-    entry: PendingRequest,
-  ): Promise<void> => {
-    try {
-      const response = await webServer.dispatch(request);
-      await writeResponse(
-        encodeDesktopResponseStart(streamId, {
-          status: response.status,
-          headers: [...response.headers.entries()],
-          hasBody: response.body !== null,
-        }),
-      );
-      if (response.body !== null) {
-        for await (const chunk of response.body) {
-          const bytes = Buffer.from(chunk);
-          for (let offset = 0; offset < bytes.byteLength; offset += DESKTOP_PIPE_CHUNK_BYTES) {
-            if (!pending.has(streamId)) return;
-            await writeResponse(
-              encodeDesktopResponseData(
-                streamId,
-                bytes.subarray(offset, offset + DESKTOP_PIPE_CHUNK_BYTES),
-              ),
-            );
-          }
-        }
-      }
-      await writeResponse(encodeDesktopResponseEnd(streamId));
-    } catch (error) {
-      if (!entry.abort.signal.aborted) {
-        await writeResponse(encodeDesktopResponseError(streamId, errorMessage(error))).catch(
-          () => {},
-        );
-      }
-    } finally {
-      pending.delete(streamId);
-    }
-  };
-
-  const handleFrame = (frame: DesktopHostRequestFrame): void => {
-    if (frame.type === "start") {
-      if (frame.streamId <= lastStreamId)
-        throw new Error(`dsh desktop: request stream ${String(frame.streamId)} is not in order`);
-      lastStreamId = frame.streamId;
-      const entry: PendingRequest = { abort: new AbortController() };
-      const streamId = frame.streamId;
-      const body = frame.hasBody
-        ? new ReadableStream<Uint8Array>({
-            start: (controller) => {
-              entry.body = controller;
-            },
-            cancel: () => {
-              entry.abort.abort();
-            },
-          })
-        : undefined;
-      pending.set(streamId, entry);
-      const request = new Request(frame.url, {
-        method: frame.method,
-        headers: frame.headers,
-        signal: entry.abort.signal,
-        ...(body === undefined ? {} : { body, duplex: "half" }),
-      } as RequestInit & { duplex?: "half" });
-      const run = dispatch(streamId, request, entry).catch((error: unknown) => {
-        ctx.logger.warn(error instanceof Error ? error : new Error(errorMessage(error)));
-      });
-      runs.add(run);
-      void run.finally(() => runs.delete(run));
-      return;
-    }
-    const entry = pending.get(frame.streamId);
-    if (entry === undefined) return;
-    switch (frame.type) {
-      case "data": {
-        // 桌面请求体很小，直接入队；不做管道 pause（pause 靠 body 流的 pull 恢复，
-        // 一旦 body 提前销毁就再没人解除，会卡死后续请求帧）。
-        entry.body?.enqueue(frame.data);
-        return;
-      }
-      case "end":
-        entry.body?.close();
-        return;
-      case "cancel":
-        entry.abort.abort();
-        return;
-      default:
-        return;
-    }
-  };
-
-  const stop = (exitCode = 0): Promise<void> => {
-    stopping ??= (async () => {
-      closing = true;
-      closeInspectorEndpoint();
-      requestPipe.pause();
-      requestPipe.destroy();
-      for (const entry of pending.values()) entry.abort.abort();
-      pending.clear();
-      const running = await application.catch(() => undefined);
-      await running?.shutdown.shutdown(exitCode);
-      await Promise.allSettled(runs);
-      await responseTail.catch(() => undefined);
-      if (!responsePipe.destroyed) responsePipe.destroy();
-      if (process.connected) process.disconnect?.();
-      process.exitCode = exitCode;
-    })();
-    return stopping;
-  };
-
-  requestPipe.on("data", (chunk: Buffer) => {
-    let frames: DesktopHostRequestFrame[];
-    try {
-      frames = decoder.push(chunk);
-      for (const frame of frames) handleFrame(frame);
-    } catch (error) {
-      send(fatalEvent(error));
-      void stop(1);
-    }
-  });
-  requestPipe.once("error", (error) => {
-    send(fatalEvent(error));
-    void stop(1);
-  });
-  requestPipe.once("end", () => {
-    try {
-      decoder.finish();
-    } catch (error) {
-      send(fatalEvent(error));
-      void stop(1);
-    }
-  });
-  process.on("message", (message: unknown) => {
-    if (!isDesktopHostCommand(message)) return;
-    // 调试端点命令先于 shutdown 分派：它们只影响回环上的 Node inspector。
-    const inspected = applyInspectorCommand(message);
-    if (inspected !== undefined) {
-      send(inspected);
-      return;
-    }
-    if (message.type === "shutdown") void stop();
-  });
-  process.once("disconnect", () => {
-    void stop();
-  });
+  const ipc = connectDesktopIpc({ application, ctx, webServer });
 
   const gateway = ctx.get("typertGateway");
   console.error(
@@ -341,8 +107,13 @@ async function main(): Promise<void> {
   // preload 交给页面），页面把它重写成 `ws://127.0.0.1:<port>/…` 就能直接用原生 WebSocket。
   const wsEndpoint = await startLoopbackUpgradeServer(webServer);
   // 这条链（含 vite 的 HMR）要从 webServer 上取到它：没有别的同源 http server 可挂升级。
-  (webServer as unknown as { desktopUpgradeServer?: unknown }).desktopUpgradeServer = wsEndpoint.server;
-  send({ type: "ready", protocolVersion: DESKTOP_HOST_PROTOCOL_VERSION, wsPort: wsEndpoint.port });
+  (webServer as unknown as { desktopUpgradeServer?: unknown }).desktopUpgradeServer =
+    wsEndpoint.server;
+  ipc.send({
+    type: "ready",
+    protocolVersion: DESKTOP_HOST_PROTOCOL_VERSION,
+    wsPort: wsEndpoint.port,
+  });
 }
 
 if (import.meta.main) {

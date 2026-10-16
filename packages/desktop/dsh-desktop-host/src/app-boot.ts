@@ -1,14 +1,14 @@
-// **dev 形态**的装配入口：profile root 就是 app 目录本身，装配清单来自 app 自己的
-// `package.json`（`dsh.profile.bundles`），解析锚点是安装根的 dsh。
+// **按 profile root 装配**这一步的唯一实现：profile root 由调用方给（dev 是 app 目录本身，打包是
+// `$DSH_HOME/profiles/<name>`），装配清单来自它的 `package.json` 的 `dsh.profile.bundles`。
 //
-// dev 的 web 形态需要它：上游 `dsh web` 按 profile 名到 `$DSH_HOME/profiles/<name>` 找 profile，
-// 与「profile root 就是 app 目录」冲突。桌面形态不需要另起入口——它把 app 目录当 profile root
-// 交给宿主，宿主按官方那两步装配（见 `./index.ts`）。
+// web 形态（[`./web.ts`](./web.ts)）与桌面形态（[`./index.ts`](./index.ts)）都走这里——两形态同一条路，
+// 差异只有 profile 名、形态自己的 overlay 与内层参数。**别再各写一份**：哪一层生效必须两边同源，
+// 否则"dev 正常、打包不对"这类问题只能靠猜（曾经如此）。
 //
-// 这一层为什么薄：装配在「app 目录即 profile root」之后是**数据**——清单、bundle 各自的 patch、
-// profile 自己的 `cordis.patch.yml`、以及形态自己的 overlay；代码只剩「读哪个目录、挂哪些
-// overlay、谁写根配置」。loader 的装载机制仍复用上游（`loadProfileDirectory` + `runProfile`），
-// 不另起第二套启动路径（理由见 `../.agents/designs/20261010-app目录即profile-root.md`）。
+// 这一层为什么薄：装配在「profile root 已定」之后是**数据**——清单、bundle 各自的 patch、profile 自己的
+// `cordis.patch.yml`、以及形态自己的 overlay；代码只剩「读哪个目录、挂哪些 overlay、谁写根配置」。
+// loader 的装载机制仍复用上游（`loadProfileDirectory` + `runProfile`），不另起第二套启动路径
+// （理由见 `../.agents/designs/20260929-桌面host的运行时面与依赖边界.md`）。
 
 import { join } from "node:path";
 import {
@@ -41,8 +41,6 @@ export function installAnchorOf(profileDir: string): string {
 export interface AppProfileOptions {
   /** profile root：app 目录本身，或它的部署副本。 */
   readonly profileDir: string;
-  /** 工具链根（`node` / `pnpm` / loader）：**不是**依赖面，锚点见 {@link installAnchorOf}。 */
-  readonly runtimeDir: string;
   /** 形态名（`desktop` / `web`）：给 `profileContext.name` 与按 profile 名门控的行。 */
   readonly profile: string;
   /** 形态自己的 overlay patch 文件，按 argv 顺序排在 bundle 层与 profile 自己的 patch 之后。 */

@@ -119,9 +119,13 @@ describe("桌面 host 子进程", () => {
     ]);
     expect(call?.args.slice(3)).toEqual([
       ENTRY,
-      "/app/seed",
+      "--profile-dir",
       "/home/profiles/desktop",
+      "--runtime-dir",
+      "/app/seed",
+      "--pnpm",
       "/app/runtime/pnpm/bin/pnpm.mjs",
+      "--node-bin",
       "/app/runtime/bin",
     ]);
     ready(child);
