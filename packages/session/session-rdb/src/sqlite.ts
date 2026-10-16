@@ -826,7 +826,8 @@ export class SqliteBackend implements Backend {
   }
 
   // 用量聚合：只读三张派生统计表——事件级用量行给去重口径的总量与「天 × 模型」桶，`t_session_usage` /
-  // `t_session_counts` 给按会话的行（含 fork 继承前缀）；归属、本地日与「是否被引用」都是物化列，不再现算、也不
+  // `t_session_counts` 给按会话的行（**含 fork 继承前缀**，见 ADR-fork不继承统计）；归属、本地日与「是否被引用」
+  // 都是物化列，不再现算、也不
   // 回连事件表。事件级按毫秒过滤、汇总表按本地日过滤，`sinceMs` 对齐本地零点时两者等价。
   async usageReport(sinceMs?: number): Promise<UsageAggregate> {
     const usageSince = sinceMs === undefined ? "" : " AND f_created_at >= ?";
@@ -1001,7 +1002,7 @@ export class SqliteBackend implements Backend {
     }
   }
 
-  // 按会话重算两张汇总表（rewind / fork 之后）：先删该会话的行，再从事件表重算。
+  // 按会话重算两张汇总表（旧日志重写后）：先删该会话的行，再从事件表重算——rewind 与 fork 不走这里。
   async rebuildSessionStats(id: SessionId): Promise<void> {
     this.db.$client.prepare("DELETE FROM t_session_usage WHERE f_session_id = ?").run(id);
     this.db.$client

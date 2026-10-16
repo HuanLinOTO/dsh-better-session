@@ -312,7 +312,7 @@ export class SessionBranchRdbProvider implements SessionBranchProvider {
       throw error;
     }
     // fork 不动统计：继承前缀的消耗是父会话真实发生的那一次，子会话只记自己新产生的
-    // （写路径旁路累加，见 ADR-统计只记真实发生的用量）。
+    // （写路径旁路累加，见 ADR-fork不继承统计）。
     return childId;
   }
 

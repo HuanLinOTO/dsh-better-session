@@ -1099,7 +1099,8 @@ export class SessionPersistenceRdb extends SessionPersistence {
     }
   }
 
-  // 重算一个会话的两张汇总表（fork 之后；best-effort，同 `recordSessionStats`）。
+  // 重算一个会话的两张汇总表（旧日志重写后；best-effort，同 `recordSessionStats`）——
+  // fork 与 rewind 都不动统计。
   async rebuildSessionStats(id: SessionId): Promise<void> {
     try {
       await this.backend.rebuildSessionStats(id);
