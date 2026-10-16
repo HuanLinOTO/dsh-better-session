@@ -636,7 +636,14 @@ export function renderRemoteClient(
                     "          source: 'lookup',",
                     `          lookup: '${method.scope}',`,
                   ]
-                : [`          wire: '${parameter.name}',`, "          source: 'json',"]),
+                : [
+                    `          wire: '${parameter.name}',`,
+                    "          source: 'json',",
+                    // 可选参数在 wire 上可以缺：gateway 判断"这个字段能少"看的就是它（`api/gateway` 的
+                    // `missing` 过滤）。只靠签名里的 `?` 不够——descriptor 里没这个标记，客户端省略
+                    // 该字段时会被判成"缺了必填"（`wire field "…" failed boundary validation`）。
+                    ...(parameter.optional ? ["          acceptsUndefined: true,"] : []),
+                  ]),
               "          codec: {",
               "            mode: 'strict',",
               `            typeSymbol: '${parameter.idType === undefined ? (typeSymbolOf(parameter.type, index) ?? `${name}#${service.namespace}/${method.method}:${parameter.name}`) : (symbolForName(parameter.idType) ?? `${name}#${service.namespace}/${method.method}:${parameter.name}`)}',`,
@@ -914,7 +921,14 @@ export function renderHostArtifact(
                     "          source: 'lookup',",
                     `          lookup: '${method.scope}',`,
                   ]
-                : [`          wire: '${parameter.name}',`, "          source: 'json',"]),
+                : [
+                    `          wire: '${parameter.name}',`,
+                    "          source: 'json',",
+                    // 可选参数在 wire 上可以缺：gateway 判断"这个字段能少"看的就是它（`api/gateway` 的
+                    // `missing` 过滤）。只靠签名里的 `?` 不够——descriptor 里没这个标记，客户端省略
+                    // 该字段时会被判成"缺了必填"（`wire field "…" failed boundary validation`）。
+                    ...(parameter.optional ? ["          acceptsUndefined: true,"] : []),
+                  ]),
               "          codec: {",
               "            mode: 'strict',",
               `            typeSymbol: '${parameter.idType === undefined ? symbolOf(parameter.type, `${name}#${service.namespace}/${method.method}:${parameter.name}`) : (symbolForName(parameter.idType) ?? `${name}#${service.namespace}/${method.method}:${parameter.name}`)}',`,
