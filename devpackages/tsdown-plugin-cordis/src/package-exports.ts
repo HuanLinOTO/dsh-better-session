@@ -58,11 +58,15 @@ function pick(files: readonly string[]): string | undefined {
   return files.find((file) => file.endsWith(".mjs") || file.endsWith(".js"));
 }
 
-// client 面取 **ESM 库**产物：`./client` 是"普通库"的出口，给 vite / node resolver 消费。
-// CJS（模块表的工厂形态）不进 exports —— 它是 `__ModuleLoader__.load` 的注册脚本，由 boot 按路径加载，
-// 不是给 `import`/`require` 用的模块。
+// client 面的两种产物各归其位：**ESM 库**给 `import` 的消费方（vite / node resolver），**CJS 工厂**给
+// `require` 的消费方（`__ModuleLoader__.load` 的注册脚本那条链）。两者都要进出口——只写 `import` 时，
+// 条件里没有 `require`，一个 CJS 消费方会落到 `default` 拿到 `.mjs`，直接 `ERR_REQUIRE_ESM`。
 function pickLibrary(files: readonly string[]): string | undefined {
   return files.find((file) => file.endsWith(".mjs"));
+}
+
+function pickFactory(files: readonly string[]): string | undefined {
+  return files.find((file) => file.endsWith(".cjs"));
 }
 
 // 出口键：`index` 是包根，其余按入口名。
@@ -143,15 +147,20 @@ async function writeManifest(
     if (found === undefined) continue;
 
     if (entry === options.clientEntry) {
-      // client 面出口：开发态指源码，发布态指 **ESM 库**产物 + 它的类型声明。
+      // client 面出口：开发态指源码；发布态按条件分派——ESM 库给 `import`，CJS 工厂给 `require`，
+      // `default` 也指向 CJS（它是"没匹配上任何条件"的兜底，CJS 消费方正是走这条）。
       const library = pickLibrary(found.runtime);
       if (library === undefined) continue;
+      const factory = pickFactory(found.runtime);
       const declarations = found.declarations.find((file) => file.endsWith(".d.mts"));
+      const conditions: Record<string, unknown> = {
+        import: artifact(library),
+        ...(factory === undefined ? {} : { require: artifact(factory) }),
+        default: artifact(factory ?? library),
+      };
       clientDev = entrySource;
       clientPublished =
-        declarations === undefined
-          ? { import: artifact(library), default: artifact(library) }
-          : { types: artifact(declarations), import: artifact(library), default: artifact(library) };
+        declarations === undefined ? conditions : { types: artifact(declarations), ...conditions };
       continue;
     }
 
