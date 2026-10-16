@@ -25,7 +25,7 @@ jobs:
 
       - name: Pack profile-facing packages
         run: |
-          mkdir -p out
+          mkdir -p "$GITHUB_WORKSPACE/out"
           for p in \
             packages/bundles/better-session \
             packages/session/session-rdb \
@@ -34,9 +34,9 @@ jobs:
             packages/session/ui-conversation-message-actions \
             packages/context/dsh-reference \
             packages/client/dsh-client-ui-primitives; do
-            (cd "$p" && pnpm pack --pack-destination ../../out)
+            (cd "$p" && pnpm pack --pack-destination "$GITHUB_WORKSPACE/out")
           done
-          ls -l out/
+          ls -l "$GITHUB_WORKSPACE/out/"
 
       - uses: actions/upload-artifact@v4
         with:
