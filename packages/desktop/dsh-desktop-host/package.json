@@ -49,10 +49,10 @@
         "types": "./dist/paths.d.mts",
         "default": "./dist/paths.js"
       },
-    "./settings-namespace": {
-      "types": "./dist/settings-namespace.d.mts",
-      "default": "./dist/settings-namespace.js"
-    },
+      "./settings-namespace": {
+        "types": "./dist/settings-namespace.d.mts",
+        "default": "./dist/settings-namespace.js"
+      },
       "./package.json": "./package.json",
       "./locale/*.json": "./locale/*.json"
     }
