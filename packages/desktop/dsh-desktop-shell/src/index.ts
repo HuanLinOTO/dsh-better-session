@@ -254,9 +254,10 @@ function developmentHostInspectPort(enabled: boolean): number | undefined {
   const configured = process.env.DSH_DESKTOP_HOST_INSPECT_PORT;
   if (!enabled || configured === undefined || configured === "") return undefined;
   const port = Number(configured);
-  if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
+  // 0 也要放行：它表示"向系统要一个"（dshdev 的缺省就是 0，见 `debugPort`）。
+  if (!Number.isSafeInteger(port) || port < 0 || port > 65_535) {
     throw new Error(
-      "dsh desktop: DSH_DESKTOP_HOST_INSPECT_PORT must be an integer from 1 through 65535",
+      "dsh desktop: DSH_DESKTOP_HOST_INSPECT_PORT must be an integer from 0 through 65535",
     );
   }
   return port;

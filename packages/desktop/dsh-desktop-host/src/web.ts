@@ -11,8 +11,13 @@
 import { bootAppProfile } from "@morlay/dsh-app-boot";
 import { parseHostInvocation } from "./invocation.ts";
 
-/** 与上游 `dsh --profile web` 相同的缺省端口。 */
-export const DEFAULT_WEB_PORT = "3080";
+/**
+ * 缺省端口：`0` = 向系统要一个。
+ *
+ * 不跟着上游用 3080 写死——本机上跑第二个实例、或别的工具占了它，web 形态就只能靠"改 `PORT`"才起得来。
+ * 实际端口看 web app 自己打的那行 `➜  Local:   http://127.0.0.1:<port>/`（浏览器也由它打开）。
+ */
+export const DEFAULT_WEB_PORT = "0";
 
 /**
  * 把缺省端口补进内层参数：web app 的 flag family 自己解析 `--port`，所以这里只在内层没给
