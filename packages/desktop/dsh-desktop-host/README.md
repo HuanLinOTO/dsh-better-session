@@ -25,4 +25,4 @@
   `web` 并多一个端口契约，见[设计 dev 形态的 profile root 就是 app 目录](../../../devpackages/dshdev/.agents/designs/20261014-数据与工作目录的-layout.md)；
 - IPC：`ready { protocolVersion, wsPort }` / `fatal { message, diagnostic }`，另外收 `shutdown`。
 
-运行时做的事（profile 装配、`webServer` 替身、认证接管、客户端 transport 与账号面）、出口面与依赖边界见[设计 桌面host的运行时面与依赖边界](./.agents/designs/20260929-桌面host的运行时面与依赖边界.md)；载波形态的取舍见[设计 桌面无端口传输与窗口对齐](../../../devpackages/dshdev/.agents/designs/20260920-桌面无端口传输与窗口对齐.md)。
+运行时做的事（profile 装配、`webServer` 替身、认证接管、客户端 transport 与账号面）、出口面与依赖边界见[设计 桌面host的运行时面与依赖边界](./.agents/designs/20260929-桌面host的运行时面与依赖边界.md)；载波形态的取舍见[设计 桌面运行形态与窗口对齐](.agents/designs/20260920-桌面运行形态与窗口对齐.md)。

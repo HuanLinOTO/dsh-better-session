@@ -7,7 +7,7 @@
 iframe 内的 bootstrap 按 `location` 算出 WebSocket 端点（`assets/devtools/connect.js:6-10`），DevTools 前端再把
 `ws` 参数拼成 `ws://<参数>`（`lib/devtools/chunks/legacy-CGqoaXQ2.js:23994`）。
 
-桌面档的页面 origin 是自定义协议 `<scheme>://app`（[桌面无端口传输与窗口对齐](../../../../../devpackages/dshdev/.agents/designs/20260920-桌面无端口传输与窗口对齐.md)），
+桌面档的页面 origin 是自定义协议 `<scheme>://app`（[桌面无端口传输与窗口对齐](../../../dsh-desktop-host/.agents/designs/20260920-桌面运行形态与窗口对齐.md)），
 于是端点被算成 `ws://app/inspector/devtools/cdp`：`app` 不是可解析主机，而 Electron 至今不支持自定义协议上的
 WebSocket（[electron#43522](https://github.com/electron/electron/issues/43522) 仍 open）。就算端点写对，桌面主传输也只有
 fetch（[index.ts:329](../../src/index.ts#L329) → 无端口 `webServer.dispatch`），`registerUpgrade` 那张表
