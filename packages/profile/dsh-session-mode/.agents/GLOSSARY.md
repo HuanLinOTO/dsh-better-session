@@ -16,30 +16,29 @@
 _避免使用_：profile（那是装配层的一份 bundle）
 
 **收口**：
-本包按会话把模式落到这个 agent 上的那一件事（`src/scope.ts` 的 `SessionScope`，模式行内部持有、**不发布服务**）：
-工具面合成一份（最终可用 = `(allowTools 留空 ? 全部 : allowTools) − denyTools`，同名时黑名单优先），装配投影
-（工具目录与与之同源的 `tool:<工具名>` section）与执行层 guard 读同一份；三个开关按会话生效。
+本包按会话把模式落到这个 agent 上的那一层（`src/scope.ts` 的 `SessionScope`，模式行内部持有、**不发布服务**）：
+工具名单合成、装配投影与执行层 guard、三个开关都按会话生效——名单合成规则（`allowTools` 留空 = 不设收窄、
+同名时黑名单优先）住 `ADR-allowTools留空即不设收窄`。
 _避免使用_：白名单收窄（收口不只有白名单）；`ctx.sessionToolScope`（已不存在）
 
 **抑制面**：
-官方那两行**在装配投影之外**自己往 `agent/pre-step` 里 append 的注入：`agent-instructions`（工作区指令）与
-`skill-catalog`（技能目录）。收口在 `agent/pre-step` 上（`prepend`，最外层）按开关丢掉它们——不动注册表、也不动
-它们所在的行。丢只发生在开关为 `false` 时（无条件丢，不看首次还是增量）；开关为 `true`（或缺省为要）时这条监听器
-零干预，官方那两行的注入节奏照旧。没 apply 过的会话完全不动。
+官方那几行**在装配投影之外**自己往 `agent/pre-step` 里 append 的注入：`agent-instructions`（工作区指令）、
+`skill-catalog`（技能目录）与 `time-context`（时钟）。收口在这条瀑布上按开关丢掉它们，判据是开关为 `false`
+（`true` 或缺省为要时零干预、官方那几行的节奏照旧）；怎么丢、代价多少见 `设计 抑制官方注入面`。
 
 **三个开关**：
-`instructions`（instruction 类注入：丢官方工作区指令 + 关通道的降级注入）、`skills`（技能目录：丢官方
-`skill-catalog` 注入）、`runtimeContext`（动态快照：`agent.ctx.systemPrompt.suppressRuntimeContext()`）。
-`instructions` 与 `runtimeContext` 缺省为要；`skills` 缺省**由工具名单推导**。
+模式里管注入面的三个布尔：`instructions`（instruction 类注入）、`skills`（技能目录）、`runtimeContext`
+（动态快照与时钟）。`instructions` 与 `runtimeContext` 缺省为要；`skills` 缺省由工具名单推导（见 `skills 推导`）；
+各自关掉什么、开关的两侧见 `设计 抑制官方注入面`。
 
 **skills 推导**：
-`skills` 不写时的判据：`(allowTools 留空 ? 全部 : allowTools) − denyTools` 含 `skill` 就要技能目录
-（`modes.ts` 的 `derivedSkills`）。它只管**注入面**——`skill` 工具本身能不能用归 `allowTools`。
+`skills` 不写时的缺省：由这个模式自己的工具名单推导——名单含 `skill` 就要技能目录。它只管**注入面**；
+`skill` 工具本身能不能用归 `allowTools`。
 
 **persona**：
 模式的两段提示词文本，注册成**该 agent 的 scope** 上的 `deployment:persona-prefix` / `-suffix` section（缺省是空串，
 即遮蔽部署级那层）。
 
 **policy 名单**：
-`allowPolicies` / `denyPolicies`：本包在行 ctx 上 `prepend` 上游两条 waterfall（`fs/write-intent` /
-`fs/edit-intent`），按会话现算哪条规则生效。**改写的是上游裁决，不是工具可见性**，所以落点不在收口。
+模式自己声明的上游 policy 规则名单：`allowPolicies` / `denyPolicies`。**改写的是上游裁决，不是工具可见性**，
+所以落点不在收口——判据与代价见 `设计 按模式的policy拦截`。
