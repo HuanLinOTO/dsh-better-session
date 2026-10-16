@@ -193,3 +193,35 @@ test("包住在没有 tsconfig 祖先的地方时，`resolve.tsconfigFilename` �
     await rm(join(elsewhere, ".."), { recursive: true, force: true });
   }
 });
+
+test("清单里解析不到的依赖不算可外置候选，也不该让预编译失败", async () => {
+  // 真实里踩到的形状：`zustand` 的 `peerDependencies` 里有 `@types/react`（optional）——类型包不在运行时闭包
+  // 里，于是解析它必然失败。它是**可选** peer、又解析不到，两条都不该让它进候选；若把异常抛出去，死的是
+  // 整个包的预编译（表现为页面上"很多资源加载不了"）。
+  const root = join(work, "absent");
+  await mkdir(join(root, "src"), { recursive: true });
+  await writeFile(join(root, "src", "index.ts"), "export const x = 1;\n", "utf8");
+  await writeFile(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "absent",
+      dependencies: { "@types/absent-types": ">=1" },
+      peerDependencies: { "@types/absent-types": ">=1", "@types/absent-optional": ">=1" },
+      peerDependenciesMeta: { "@types/absent-optional": { optional: true } },
+    })}\n`,
+    "utf8",
+  );
+
+  const built = await bundlePackage({
+    cacheRoot,
+    repoRoot: work,
+    alias: [],
+    name: "absent",
+    version: "1.0.0",
+    input: { index: join(root, "src", "index.ts") },
+    watch: [join(root, "src")],
+    // **本包视角**的清单：现场预编译时由调用方给（外置名单与版本表从它来）——不给就走不到那条路径。
+    manifestOf: join(root, "package.json"),
+  });
+  expect([...(built?.files.keys() ?? [])]).toEqual(["index"]);
+});

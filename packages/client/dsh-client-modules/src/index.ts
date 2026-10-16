@@ -5,7 +5,8 @@ import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Duplex } from "node:stream";
 import type { Context } from "@deepseek-ai/cordis";
-import { ASSET_MIME, NODE_BUILTIN } from "@local/tsdown-plugin-cordis/assets";
+import { traceOf } from "./trace.ts";
+import { ASSET_MIME, NODE_BUILTIN } from "@morlay/dsh-cordis-assets/assets";
 import { devExcluded, isAggregated } from "./config.ts";
 import {
   appBootDir,
@@ -139,6 +140,8 @@ function watchOf(root: string | undefined, entry: string): string[] {
 }
 
 export function apply(ctx: Context): void {
+  // 细节诊断（逐包、逐请求）默认静默，`DSH_TRACE=1` 时走 logger（见 `trace.ts`）。
+  const trace = traceOf(ctx, "federation");
   const webServer = ctx.get("webServer") as RouteHost | undefined;
   // 本包的位置（`src/` 或打包后的 `dist/`）：`app-boot` 与仓库根都从它推。
   //
@@ -172,7 +175,7 @@ export function apply(ctx: Context): void {
     const onExit = (code: number): void => {
       // 退出回调是同步的（不能 await）：日志路径在退出前早已解析好，直接取缓存值。
       const shown = resolvedLogFile ?? "(尚未就绪)";
-      process.stderr.write(`[dsh] dev 宿主退出：code=${String(code)}，异常日志见 ${shown}\n`);
+      ctx.logger.info(`dev 宿主退出：code=${String(code)}，异常日志见 ${shown}\n`);
     };
     process.on("uncaughtException", onException);
     process.on("unhandledRejection", onRejection);
@@ -411,7 +414,7 @@ export function apply(ctx: Context): void {
     // 路由不据此改变响应（产物一律协商缓存）。
     const rest = (url.slice(`${CLIENT_MODULES_PREFIX}/`.length).split("?")[0] ?? "");
     const slash = rest.indexOf("/");
-    process.stderr.write(`[fed] rest=${rest} slash=${String(slash)}\n`);
+    trace("rest %s slash %s", rest, slash);
     if (slash <= 0) return false;
     const pkgVersion = rest.slice(0, slash);
     const file = rest.slice(slash + 1);
@@ -460,7 +463,7 @@ export function apply(ctx: Context): void {
         : ((await exportTargetOf(root, exportName === "index" ? undefined : exportName)) ??
           // 清单没覆盖这个子路径时按物理路径找（没有 `exports` 的老包：`picomatch/posix` 就是 `posix.js`）。
           (await fileInPackage(root, exportName)));
-    process.stderr.write(
+    trace(
       `[fed] ${name}@${version}/${exportName} root=${String(root)} entry=${String(entry)}\n`,
     );
     if (entry === undefined) {
@@ -472,7 +475,7 @@ export function apply(ctx: Context): void {
       // 上游产物坏了。现在如实 404：谁引了不存在的东西，一眼就看见。可选依赖那条：产物里的 `require`
       // 已被转成模块图里的 ESM import，一个 404 会让整条图断掉、入口一行都不执行——那也正是"缺什么"的
       // 正确表现（该装它、或该在我们的包里声明它），而不是静默降级。
-      process.stderr.write(
+      trace(
         `[federation] ${name}@${version}/${exportName}: unresolved-entry root=${String(root)}\n`,
       );
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
@@ -482,6 +485,8 @@ export function apply(ctx: Context): void {
     const bundled = await bundlePackage({
       cacheRoot,
       repoRoot: await resolutionRoot(),
+      // 预编译的诊断输出走这条链的 logger（细节级别：默认静默，要排查时把级别调低）。
+      log: (message) => trace(message),
       alias: federationAlias,
       name,
       version,
@@ -496,11 +501,11 @@ export function apply(ctx: Context): void {
       // 编译设置：解析根那份 tsconfig（有就用；没有交给 rolldown 默认）。
       ...(await tsconfigOf().then((path) => (path === undefined ? {} : { tsconfig: path }))),
     }).catch((error: unknown) => {
-      process.stderr.write(`[federation] ${name}: bundle-failed ${String(error)}\n`);
+      ctx.logger.warn(`${name}: bundle-failed ${String(error)}\n`);
       return undefined;
     });
     if (bundled === undefined) return false;
-    process.stderr.write(
+    trace(
       `[fed-tail] ${name}: files=${[...bundled.files.keys()].join(",")} exportName=${exportName}\n`,
     );
     // 清单的键是**文件名**（出口产物 `<出口名>.js`，拆出的块 `chunks/…`）：按 `exportName` 去查会落空
@@ -510,13 +515,13 @@ export function apply(ctx: Context): void {
       bundled.files.get(exportName) ??
       bundled.files.get("client.js") ??
       bundled.files.get("index.js");
-    process.stderr.write(`[fed-tail] ${name}: target=${String(target)} 绝对=${String(target === undefined ? undefined : join(cacheRoot, target))}\n`);
+    trace(`${name}: target=${String(target)} 绝对=${String(target === undefined ? undefined : join(cacheRoot, target))}\n`);
     if (target === undefined) {
-      process.stderr.write(`[fed] ${name}: missing-export export=${exportName} have=${[...bundled.files.keys()].join(",")}\n`);
+      ctx.logger.warn(`${name}: missing-export export=${exportName} have=${[...bundled.files.keys()].join(",")}\n`);
       return false;
     }
     const code = await readFile(join(cacheRoot, target), "utf8").catch((error: unknown) => {
-      process.stderr.write(`[fed] ${name}: unreadable file=${join(cacheRoot, target)} ${String(error)}\n`);
+      ctx.logger.warn(`${name}: unreadable file=${join(cacheRoot, target)} ${String(error)}\n`);
       return undefined;
     });
     // 空产物是**合法的**：纯类型 / 空的 client 半编译出来就是空 JS，不是失败。
@@ -565,12 +570,12 @@ export function apply(ctx: Context): void {
       return;
     }
     if (!known) {
-      process.stderr.write(`[reject] ${req.url ?? ""} referer=${req.headers.referer ?? "-"}\n`);
+      trace("%s referer %s", req.url ?? "", req.headers.referer ?? "-");
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       res.end("client-modules: 这是仓库里的路径，打包形态下不存在（页面资源在 app-boot 下、包走 exports）\n");
       return;
     }
-    process.stderr.write(`[serveAny] ${req.url ?? ""}
+    trace(`[serveAny] ${req.url ?? ""}
 `);
     // 页面由**我们自己**服务：读 `app-boot/index.html`，注入 vite 的客户端（HMR），入口脚本仍走 vite
     // （它要转译 `index.ts`、解析 `dsh-client-rows` 虚拟模块）。
@@ -580,7 +585,7 @@ export function apply(ctx: Context): void {
     if (requestPath === "/" || requestPath === "/index.html") {
       const html = await readFile(join(appRoot, "index.html"), "utf8").catch(() => undefined);
       if (html === undefined) {
-        process.stderr.write(`[serveAny] 页面骨架读不到：${join(appRoot, "index.html")}\n`);
+        ctx.logger.warn(`[serveAny] 页面骨架读不到：${join(appRoot, "index.html")}\n`);
         return fallback(req, res);
       }
       try {
@@ -601,7 +606,7 @@ export function apply(ctx: Context): void {
     const requestUrl = req.url ?? "";
     if (requestUrl.split("?")[0]?.startsWith(`${CLIENT_MODULES_PREFIX}/`) === true) {
       const handled = await serveFederation(requestUrl, req, res);
-      process.stderr.write(`[fed-exit] ${requestUrl} handled=${String(handled)} status=${String(res.statusCode)}\n`);
+      trace("%s handled %s status %s", requestUrl, handled, res.statusCode);
       if (handled) return;
     }
     try {
@@ -617,11 +622,11 @@ export function apply(ctx: Context): void {
     // **`@` 前缀的路径不兜给页面**：那是这条链的模块 URL 空间，没解析出来就是解析规则漏了一段——当场 404
     // 并把 URL 与 referer 打出来，别让它静默变成一份 HTML（那样浏览器只会报"模块语法错误"）。
     if (viteHandoff !== undefined && viteHandoff.serve(req, res)) {
-      process.stderr.write(`[vite-out] ${path} status=${String(res.statusCode)}\n`);
+      trace("%s status %s", path, res.statusCode);
       return;
     }
     if (path.startsWith("/@")) {
-      process.stderr.write(`[unresolved] ${req.url ?? ""} referer=${req.headers.referer ?? "-"}\n`);
+      ctx.logger.warn(`${req.url ?? ""} referer=${req.headers.referer ?? "-"}\n`);
     }
     return fallback(req, res);
   };

@@ -14,8 +14,8 @@ import { createRequire } from "node:module";
 import { findPackageJSON } from "node:module";
 import { dirname, join, relative, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import { clientAssetPlugin, NODE_BUILTIN } from "@local/tsdown-plugin-cordis/assets";
-import { cssInlinePlugins } from "@local/tsdown-plugin-cordis/styles";
+import { clientAssetPlugin, NODE_BUILTIN } from "@morlay/dsh-cordis-assets/assets";
+import { cssInlinePlugins } from "@morlay/dsh-cordis-assets/styles";
 import { rolldown, type Plugin } from "rolldown";
 import { esmExternalRequirePlugin, type PluginOption } from "vite";
 import { encodePackageName, entryFileNameOf, packageNameOf } from "./resolve.ts";
@@ -84,6 +84,8 @@ export function depsUrlOf(specifier: string, version: string, file = "index.js")
 
 /** 一次产出的输入。 */
 export interface BundleOptions {
+  /** 诊断输出（`[bundle-*]`）：由调用方接到自己的 logger（cordis 的 `ctx.logger`）；不注入即静默。 */
+  readonly log?: (message: string) => void;
   /** 缓存根（{@link CLIENT_MODULES_CACHE}）。 */
   cacheRoot: string;
   /** 仓库根（vite 的 root）。 */
@@ -228,13 +230,25 @@ export async function resolvableVersionsOf(manifestPath: string | undefined): Pr
   const manifest = JSON.parse(await readFile(manifestPath, "utf8").catch(() => "{}")) as {
     dependencies?: Record<string, string>;
     peerDependencies?: Record<string, string>;
+    peerDependenciesMeta?: Record<string, { readonly optional?: boolean }>;
   };
+  // **可选 peer 不是候选**：它可以不被任何消费方提供（`zustand` 的 `@types/react`、`immer` 都是这种），
+  // 声明它只是"你若提供我就用"。
   const names = new Set([
     ...Object.keys(manifest.dependencies ?? {}),
-    ...Object.keys(manifest.peerDependencies ?? {}),
+    ...Object.keys(manifest.peerDependencies ?? {}).filter(
+      (name) => manifest.peerDependenciesMeta?.[name]?.optional !== true,
+    ),
   ]);
   for (const name of names) {
-    const found = findPackageJSON(name, here);
+    // **解析不到的也不是候选**：它不在闭包里（声明了没装、或只在开发/构建期存在），外置它只会让产物留一条
+    // 悬空的 import。判据是"声明过**且**能解析到"——解析失败在这里是**预期**结果，不是异常。
+    let found: string | undefined;
+    try {
+      found = findPackageJSON(name, here);
+    } catch {
+      continue;
+    }
     if (found === undefined) continue;
     const parsed = JSON.parse(await readFile(found, "utf8").catch(() => "{}")) as { version?: unknown };
     if (typeof parsed.version === "string") versions.set(name, parsed.version);
@@ -311,6 +325,7 @@ async function cjsShimOf(options: {
   exportName: string;
   entry: string;
   outDir: string;
+  log?: (message: string) => void;
 }): Promise<string | undefined> {
   const source = await readFile(options.entry, "utf8").catch(() => "");
   // 判据是**CJS 入口**：`.js`/`.cjs` 且源码里真的在赋值 `module.exports` / `exports.x`（`react` 的入口是
@@ -346,7 +361,7 @@ async function cjsShimOf(options: {
     ].join("\n"),
     "utf8",
   );
-  process.stderr.write(`[bundle-cjs] ${options.name}/${options.exportName}: 补 ${String(named.length)} 个具名导出\n`);
+  options.log?.(`[bundle-cjs] ${options.name}/${options.exportName}: 补 ${String(named.length)} 个具名导出\n`);
   return file;
 }
 
@@ -466,13 +481,13 @@ const building = new Map<string, Promise<Bundled | undefined>>();
 
 async function bundlePackageOnce(options: BundleOptions, key: string): Promise<Bundled | undefined> {
   const wanted = Object.keys(options.input);
-  process.stderr.write(`[bundle-in] ${options.name}: input=${wanted.join(",")} cache=${options.cacheRoot}\n`);
+  options.log?.(`[bundle-in] ${options.name}: input=${wanted.join(",")} cache=${options.cacheRoot}\n`);
   if (wanted.length === 0) return undefined;
   const outDir = join(options.cacheRoot, key);
   const manifestPath = join(outDir, ".files.json");
-  process.stderr.write(`[bundle-rev] ${options.name}: hash-start watch=${options.watch.join(",")}\n`);
+  options.log?.(`[bundle-rev] ${options.name}: hash-start watch=${options.watch.join(",")}\n`);
   const rev = `${BUNDLER_REV}:${await fingerprint(options.watch)}`;
-  process.stderr.write(`[bundle-rev] ${options.name}: hash=${rev}\n`);
+  options.log?.(`[bundle-rev] ${options.name}: hash=${rev}\n`);
   const cached = JSON.parse(await readFile(manifestPath, "utf8").catch(() => "{}")) as {
     rev?: string;
     files?: Record<string, string>;
@@ -532,13 +547,19 @@ async function bundlePackageOnce(options: BundleOptions, key: string): Promise<B
     }),
   ];
   const startedAt = Date.now();
-  process.stderr.write(`[bundle-build] ${options.name}: rolldown start\n`);
+  options.log?.(`[bundle-build] ${options.name}: rolldown start\n`);
   // 入口补偿：CJS 要带具名导出的包装；CSS 不能直接当入口（vite 的库模式 `cssCodeSplit: false`，
   // 明确拒绝 `rolldownOptions.input` 里出现 CSS 文件），包一层 side-effect import 让样式插件处理它。
   const input: Record<string, string> = {};
   for (const [exportName, entry] of Object.entries(options.input)) {
     input[exportName] =
-      (await cjsShimOf({ name: options.name, exportName, entry, outDir })) ??
+      (await cjsShimOf({
+        name: options.name,
+        exportName,
+        entry,
+        ...(options.log === undefined ? {} : { log: options.log }),
+        outDir,
+      })) ??
       (await cssShimOf({ exportName, entry, outDir })) ??
       entry;
   }
@@ -584,10 +605,10 @@ async function bundlePackageOnce(options: BundleOptions, key: string): Promise<B
         }),
   });
   await bundle.close();
-  process.stderr.write(`[bundle-build] ${options.name}: rolldown done ms=${String(Date.now() - startedAt)}\n`);
+  options.log?.(`[bundle-build] ${options.name}: rolldown done ms=${String(Date.now() - startedAt)}\n`);
 
   if (!items.some((item) => item.type === "chunk")) {
-    process.stderr.write(
+    options.log?.(
       `[bundle] ${options.name}: 输出为空（input=${wanted.join(",")} outputs=${String(items.length)}）\n`,
     );
     return undefined;

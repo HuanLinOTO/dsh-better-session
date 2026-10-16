@@ -9,6 +9,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Context } from "@deepseek-ai/cordis";
+import { traceOf } from "./trace.ts";
 import { createServer, type ServerOptions, type ViteDevServer } from "vite";
 import { clientModulesAlias } from "./bundle.ts";
 import { dshClientRowsPlugin, ROWS_VIRTUAL } from "./vite-plugin.ts";
@@ -57,6 +58,7 @@ export async function startViteDev(
     httpServer?: HmrServer | undefined;
   },
 ): Promise<ViteHandoff> {
+  const trace = traceOf(ctx, "vite");
   const { repoRoot, base } = options;
   /**
    * 页面与入口所在的真实目录（vite 的 root）。
@@ -177,11 +179,11 @@ export async function startViteDev(
       // 非 2xx 才留痕（正常请求不吵）：vite 没接住时能立刻看到是哪条 URL。
       res.on("finish", () => {
         if (res.statusCode < 400) return;
-        process.stderr.write(`[vite] ${req.method ?? ""} ${req.url ?? ""} → ${String(res.statusCode)}\n`);
+        trace("%s %s → %s", req.method ?? "", req.url ?? "", res.statusCode);
       });
       ;(current ?? server).middlewares(req, res, () => {
         // vite 没接住：留下线索（桌面形态经自定义协议进来，请求形态与 http 不同，这条日志能立刻定位）。
-        process.stderr.write(`[vite] miss ${req.method ?? ""} ${req.url ?? ""}\n`);
+        trace("miss %s %s", req.method ?? "", req.url ?? "");
         if (!res.headersSent) res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
         if (!res.writableEnded) res.end("client-modules: vite 没有这条路由\n");
       });
