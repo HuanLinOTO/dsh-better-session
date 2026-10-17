@@ -44,8 +44,10 @@ describe("发布态的包出口", () => {
     expect(dropped).toEqual([]);
   });
 
-  // client 面发布态是**普通 ESM 库**：消费方按 vite / node 的 resolver 取它，CJS 工厂（模块表的注册脚本）
-  // 不进出口——它由 boot 按路径加载。
+  // client 面发布态是**双消费方出口**：vite / node 的 resolver 走 `import`/`types` 拿 ESM 库；
+  // dsh web 宿主的模块表按 `default` 条件取**CJS 工厂**（`__ModuleLoader__.load` 注册脚本）——宿主把它当
+  // classic script 加载，拿到裸 ESM 必然解析失败（"loaded without registering"）。自家 boot 按路径直载
+  // `dist/client.cjs` 的那条链不受 exports 影响，两种消费方并存。
   it("client 面开发态出口回源，发布态指 ESM 库产物与它的类型", () => {
     const clients = packages.filter(({ manifest }) => manifest.exports?.["./client"] !== undefined);
     expect(clients.length).toBeGreaterThan(0);
@@ -58,8 +60,7 @@ describe("发布态的包出口", () => {
         | undefined;
       // 开发态的出口就是一个指源码的字符串（宿主按它读字节），与 host 面同一条规则。
       if (dev !== "./src/client/index.ts") wrong.push(`${name}: dev=${String(dev)}`);
-      // 发布态：`import`/`default` 指 **ESM 库**（CJS 工厂不进 exports，它是模块表的注册脚本），
-      // `types` 指 ESM 面的声明。
+      // 发布态：`import` 指 **ESM 库**、`types` 指 ESM 面的声明、`require`/`default` 指 **CJS 工厂**。
       if (published?.import !== "./dist/client.mjs")
         wrong.push(`${name}: import=${String(published?.import)}`);
       if (published?.types !== "./dist/client.d.mts")
@@ -68,13 +69,13 @@ describe("发布态的包出口", () => {
     expect(wrong).toEqual([]);
   });
 
-  it("client 面只出一种形态：ESM 库（CJS 工厂不进 exports）", () => {
+  it("client 面的 require/default 指 CJS 工厂（宿主模块表按 default 取注册脚本）", () => {
     const clients = packages.filter(({ manifest }) => manifest.exports?.["./client"] !== undefined);
     const wrong = clients.filter(({ manifest }) => {
       const published = (manifest.publishConfig?.exports ?? {})["./client"] as
-        | { default?: unknown }
+        | { require?: unknown; default?: unknown }
         | undefined;
-      return published?.default !== "./dist/client.mjs";
+      return published?.require !== "./dist/client.cjs" || published?.default !== "./dist/client.cjs";
     });
     expect(wrong.map(({ name }) => name)).toEqual([]);
   });
